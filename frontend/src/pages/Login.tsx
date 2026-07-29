@@ -9,7 +9,7 @@ import Card from '../components/ui/Card';
 import useDocumentMeta from '../hooks/useDocumentMeta';
 
 export default function Login() {
-  useDocumentMeta('Log in', 'Log in to your Burina account to continue your JAMB, WAEC and NECO practice.');
+  useDocumentMeta('Log in', 'Log in to your Acelume account to continue your JAMB, WAEC and NECO practice.');
   const { login } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();

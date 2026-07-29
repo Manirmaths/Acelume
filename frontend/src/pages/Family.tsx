@@ -204,7 +204,7 @@ function ChildRow({ child, onUnlinked }: { child: LinkedChild; onUnlinked: () =>
 }
 
 export default function Family() {
-  useDocumentMeta('Family', 'Link a parent, guardian, or tutor to watch your Burina progress -- read-only, no password sharing.');
+  useDocumentMeta('Family', 'Link a parent, guardian, or tutor to watch your Acelume progress -- read-only, no password sharing.');
   const queryClient = useQueryClient();
   const { data: children, isLoading } = useQuery({
     queryKey: ['guardian-children'],

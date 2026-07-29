@@ -1,7 +1,7 @@
 import useDocumentMeta from '../hooks/useDocumentMeta';
 
 export default function PrivacyPolicy() {
-  useDocumentMeta('Privacy Policy', 'How Burina collects, uses, and protects your data.');
+  useDocumentMeta('Privacy Policy', 'How Acelume collects, uses, and protects your data.');
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16">
       <h1 className="font-display font-extrabold text-3xl text-ink-900 mb-2">Privacy Policy</h1>
@@ -10,7 +10,7 @@ export default function PrivacyPolicy() {
       <div className="space-y-8 text-ink-700 leading-relaxed">
         <section>
           <p>
-            Burina ("we", "us", "our"), by Arewa Tutorials, provides exam-preparation practice for JAMB, WAEC,
+            Acelume ("we", "us", "our"), by Arewa Tutorials, provides exam-preparation practice for JAMB, WAEC,
             NECO and Post-UTME candidates in Nigeria, via our website (naijaprep.com.ng) and our Android app.
             This policy explains what information we collect, how we use it, and the choices you have.
           </p>
@@ -58,7 +58,7 @@ export default function PrivacyPolicy() {
         <section>
           <h2 className="font-display font-bold text-xl text-ink-900 mb-2">Children's privacy</h2>
           <p>
-            Burina is intended for students preparing for JAMB/WAEC/NECO/Post-UTME, typically aged 16 and
+            Acelume is intended for students preparing for JAMB/WAEC/NECO/Post-UTME, typically aged 16 and
             older. It is not directed at children under 13, and we do not knowingly collect personal
             information from children under 13.
           </p>

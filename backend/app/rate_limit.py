@@ -11,7 +11,7 @@ would lock out legitimate students, not just attackers. These thresholds
 target credential-stuffing/brute-force speed, not normal multi-user traffic.
 
 NOTE: in-memory storage means limits reset on every process restart and are
-NOT shared across multiple backend instances/workers. Naija Prep currently
+NOT shared across multiple backend instances/workers. Acelume currently
 runs as a single Render service instance, so this is fine for now -- if the
 API is ever scaled to multiple instances, switch slowapi to a Redis storage
 backend (`storage_uri="redis://..."`) so limits are shared, otherwise each

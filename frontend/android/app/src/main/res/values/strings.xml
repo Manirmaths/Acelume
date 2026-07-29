@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Burina</string>
-    <string name="title_activity_main">Burina</string>
+    <string name="app_name">Acelume</string>
+    <string name="title_activity_main">Acelume</string>
     <string name="package_name">com.naijaprep.app</string>
     <string name="custom_url_scheme">com.naijaprep.app</string>
 </resources>

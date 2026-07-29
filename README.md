@@ -1,4 +1,4 @@
-Naija Prep is a web app that helps students in Nigeria prepare for JAMB, WAEC, NECO, and Post-UTME. It provides subject/topic-based MCQ practice, a full JAMB CBT mock exam, a diagnostic placement test, progress tracking, and streak-based gamification.
+Acelume (formerly Naija Prep) is a web app that helps students in Nigeria prepare for JAMB, WAEC, NECO, and Post-UTME. It provides subject/topic-based MCQ practice, a full JAMB CBT mock exam, a diagnostic placement test, progress tracking, and streak-based gamification.
 
 ## Tech stack (v2 — migrated from Flask/Jinja)
 
@@ -10,7 +10,7 @@ The two are fully decoupled: the backend is a JSON REST API, the frontend is a s
 ## Project structure
 
 ```
-Naija Prep/
+Acelume/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py            # FastAPI app + router registration + CORS

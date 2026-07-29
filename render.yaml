@@ -1,7 +1,12 @@
 services:
-  # FastAPI backend -> serves the API at api.naijaprep.com.ng (api.burina.ng
-  # to be added as a custom domain in Render once DNS is set up -- see
-  # naijaprep_competitor_and_rename memory for the full migration plan)
+  # FastAPI backend -> serves the API at api.naijaprep.com.ng.
+  #
+  # Rename history: Naija Prep -> Burina (abandoned) -> Acelume (current, and
+  # the GitHub repo name). As of 2026-07-29 the rename is code/copy only --
+  # no Acelume domain is registered yet, so every domain below is still
+  # naijaprep.com.ng and that is deliberate, not an oversight. When an Acelume
+  # domain is secured, add it as a custom domain in Render and append it to
+  # FRONTEND_ORIGINS *after* the naijaprep entries (see note below).
   - type: web
     name: naijaprep-api
     runtime: python
@@ -16,13 +21,15 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: FRONTEND_ORIGINS
-        # Both domains accepted during the Burina rebrand transition -- keep
-        # naijaprep.com.ng entries FIRST so PUBLIC_APP_URL (which defaults to
-        # FRONTEND_ORIGINS[0] when unset) keeps building password-reset links
-        # against the domain that's actually live today. Once burina.ng DNS
-        # is confirmed working and the native app has been rebuilt/resubmitted
-        # pointing at it, reorder or drop the naijaprep.com.ng entries.
-        value: https://naijaprep.com.ng,https://www.naijaprep.com.ng,https://burina.ng,https://www.burina.ng
+        # Keep the live domain FIRST: PUBLIC_APP_URL defaults to
+        # FRONTEND_ORIGINS[0] when unset, and that is what builds
+        # password-reset links. Putting an unregistered domain first would
+        # silently send users reset links to a domain that does not resolve.
+        #
+        # The burina.ng entries that used to sit here were removed on
+        # 2026-07-29 -- that domain was never registered and the name was
+        # dropped in favour of Acelume, so they were dead config.
+        value: https://naijaprep.com.ng,https://www.naijaprep.com.ng
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "10080"
       - key: ENV
@@ -32,8 +39,10 @@ services:
       - key: PAYSTACK_PUBLIC_KEY
         sync: false
 
-  # React/Vite frontend -> served at naijaprep.com.ng (burina.ng to be added
-  # as a custom domain in Render once DNS is set up)
+  # React/Vite frontend -> served at naijaprep.com.ng. Service names below
+  # (naijaprep-api / naijaprep-web) are Render resource identifiers, not
+  # branding -- renaming them would recreate the services and lose their
+  # configured env vars and custom domains, so they stay as they are.
   - type: web
     name: naijaprep-web
     runtime: static

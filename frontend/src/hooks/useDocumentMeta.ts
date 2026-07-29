@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
-const SITE_NAME = 'Burina';
-const DEFAULT_TITLE = 'Burina — Exam Preparation and University Learning';
+const SITE_NAME = 'Acelume';
+const DEFAULT_TITLE = 'Acelume — Exam Preparation and University Learning';
 
 /**
  * Sets the document title (and, optionally, the meta description) for the

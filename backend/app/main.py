@@ -16,7 +16,7 @@ from app.routers import (
 # full schema -- fine for local dev, unnecessary attack-surface/information
 # disclosure on the public production API. Disabled in production only.
 app = FastAPI(
-    title="Burina API",
+    title="Acelume API",
     version="2.0.0",
     docs_url=None if settings.IS_PRODUCTION else "/docs",
     redoc_url=None if settings.IS_PRODUCTION else "/redoc",

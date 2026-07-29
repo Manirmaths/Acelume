@@ -26,7 +26,7 @@ export default function PublicLayout() {
               <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center text-sm shadow-sm">
                 B
               </span>
-              Burina
+              Acelume
             </Link>
 
             {isHome && (
@@ -65,7 +65,7 @@ export default function PublicLayout() {
 
       <footer className="bg-ink-900 text-ink-400 py-10 mt-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
-          <p>&copy; {new Date().getFullYear()} Burina by Arewa Tutorials. Your ambition. Within reach.</p>
+          <p>&copy; {new Date().getFullYear()} Acelume by Arewa Tutorials. Your ambition. Within reach.</p>
           <div className="flex items-center gap-4">
             <Link to="/privacy" className="hover:text-ink-200 transition-colors">Privacy Policy</Link>
             <p className="flex items-center gap-1 text-ink-500">

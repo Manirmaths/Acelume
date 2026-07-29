@@ -27,7 +27,7 @@ class Settings:
     # in dev/until configured -- app/email.py falls back to logging the
     # reset link instead of failing, so forgot-password still works locally.
     RESEND_API_KEY: str = os.environ.get("RESEND_API_KEY", "")
-    RESEND_FROM_EMAIL: str = os.environ.get("RESEND_FROM_EMAIL", "Burina <noreply@naijaprep.com.ng>")
+    RESEND_FROM_EMAIL: str = os.environ.get("RESEND_FROM_EMAIL", "Acelume <noreply@naijaprep.com.ng>")
     # Base URL used to build the reset-password link sent by email.
     PUBLIC_APP_URL: str = os.environ.get(
         "PUBLIC_APP_URL",

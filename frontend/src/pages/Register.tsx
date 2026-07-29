@@ -11,7 +11,7 @@ import useDocumentMeta from '../hooks/useDocumentMeta';
 export default function Register() {
   useDocumentMeta(
     'Sign up free',
-    'Create a free Burina account for JAMB, WAEC and NECO practice questions, an AI tutor, and a full CBT mock exam.'
+    'Create a free Acelume account for JAMB, WAEC and NECO practice questions, an AI tutor, and a full CBT mock exam.'
   );
   const { register } = useAuth();
   const { t } = useLanguage();

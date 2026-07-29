@@ -50,7 +50,7 @@ const FEATURES = [
   {
     icon: 'fa-solid fa-medal',
     title: 'Achievements & leaderboard',
-    desc: 'Unlock badges as you practice, and see how you stack up against everyone else on Burina.',
+    desc: 'Unlock badges as you practice, and see how you stack up against everyone else on Acelume.',
   },
 ];
 

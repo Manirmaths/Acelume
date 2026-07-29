@@ -84,7 +84,7 @@ export default function AppShell() {
         <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center text-sm shadow-sm">
           B
         </span>
-        Burina
+        Acelume
       </Link>
 
       <nav className="flex-1 px-3 space-y-1">

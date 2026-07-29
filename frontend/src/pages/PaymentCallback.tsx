@@ -16,7 +16,7 @@ const POLL_INTERVAL_MS = 2000;
 const MAX_POLLS = 10;
 
 export default function PaymentCallback() {
-  useDocumentMeta('Payment', 'Confirming your Burina Premium payment.');
+  useDocumentMeta('Payment', 'Confirming your Acelume Premium payment.');
   const [status, setStatus] = useState<'checking' | 'success' | 'pending'>('checking');
 
   useEffect(() => {

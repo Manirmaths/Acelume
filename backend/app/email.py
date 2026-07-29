@@ -47,12 +47,12 @@ def send_email(to: str, subject: str, html: str, text: str | None = None) -> boo
 
 
 def send_password_reset_email(to: str, reset_url: str) -> bool:
-    subject = "Reset your Burina password"
+    subject = "Reset your Acelume password"
     html = f"""
     <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
       <h2 style="color: #111827;">Reset your password</h2>
       <p style="color: #374151;">
-        Someone (hopefully you) asked to reset the password on your Burina account.
+        Someone (hopefully you) asked to reset the password on your Acelume account.
         This link expires in 30 minutes and can only be used once.
       </p>
       <p style="margin: 24px 0;">
@@ -64,5 +64,5 @@ def send_password_reset_email(to: str, reset_url: str) -> bool:
       </p>
     </div>
     """
-    text = f"Reset your Burina password: {reset_url} (expires in 30 minutes, one-time use)"
+    text = f"Reset your Acelume password: {reset_url} (expires in 30 minutes, one-time use)"
     return send_email(to, subject, html, text)

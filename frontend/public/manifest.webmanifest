@@ -1,7 +1,7 @@
 {
-  "name": "Burina",
-  "short_name": "Burina",
-  "description": "Burina: your ambition, within reach. Practice for JAMB, WAEC, NECO and Post-UTME with subject/topic practice, a full CBT mock exam, an AI tutor and progress tracking.",
+  "name": "Acelume",
+  "short_name": "Acelume",
+  "description": "Acelume: your ambition, within reach. Practice for JAMB, WAEC, NECO and Post-UTME with subject/topic practice, a full CBT mock exam, an AI tutor and progress tracking.",
   "start_url": "/dashboard",
   "id": "/dashboard",
   "scope": "/",

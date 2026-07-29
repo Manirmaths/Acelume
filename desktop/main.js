@@ -1,4 +1,4 @@
-// Burina desktop shell. Like the Android wrapper, this loads the live
+// Acelume desktop shell. Like the Android wrapper, this loads the live
 // site directly (https://naijaprep.com.ng) inside an Electron BrowserWindow
 // rather than bundling a static copy of the frontend -- so the existing
 // httpOnly auth cookie and CORS setup work exactly as they do in a normal
@@ -13,7 +13,7 @@ function createWindow() {
     height: 860,
     minWidth: 900,
     minHeight: 600,
-    title: 'Burina',
+    title: 'Acelume',
     backgroundColor: '#f8f9fb',
     webPreferences: {
       contextIsolation: true,

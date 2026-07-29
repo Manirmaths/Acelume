@@ -1,7 +1,7 @@
 import useDocumentMeta from '../hooks/useDocumentMeta';
 
 export default function DeleteAccount() {
-  useDocumentMeta('Delete Your Account', 'How to request deletion of your Burina account and data.');
+  useDocumentMeta('Delete Your Account', 'How to request deletion of your Acelume account and data.');
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16">
       <h1 className="font-display font-extrabold text-3xl text-ink-900 mb-2">Delete Your Account</h1>
@@ -10,7 +10,7 @@ export default function DeleteAccount() {
       <div className="space-y-8 text-ink-700 leading-relaxed">
         <section>
           <p>
-            You can request permanent deletion of your Burina account and all associated data at any
+            You can request permanent deletion of your Acelume account and all associated data at any
             time, whether you signed up on the website or the Android app.
           </p>
         </section>
