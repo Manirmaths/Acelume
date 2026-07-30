@@ -64,7 +64,7 @@ export default function PublicLayout() {
 
       <footer className="bg-ink-900 text-ink-400 py-10 mt-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm">
-          <p>&copy; {new Date().getFullYear()} Acelume by Arewa Tutorials. Your ambition. Within reach.</p>
+          <p>&copy; {new Date().getFullYear()} Acelume by Arewa Tutorials. Pass on purpose.</p>
           <div className="flex items-center gap-4">
             <Link to="/privacy" className="hover:text-ink-200 transition-colors">Privacy Policy</Link>
             <p className="flex items-center gap-1 text-ink-500">
