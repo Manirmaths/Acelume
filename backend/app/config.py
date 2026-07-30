@@ -27,7 +27,7 @@ class Settings:
     # in dev/until configured -- app/email.py falls back to logging the
     # reset link instead of failing, so forgot-password still works locally.
     RESEND_API_KEY: str = os.environ.get("RESEND_API_KEY", "")
-    RESEND_FROM_EMAIL: str = os.environ.get("RESEND_FROM_EMAIL", "Acelume <noreply@naijaprep.com.ng>")
+    RESEND_FROM_EMAIL: str = os.environ.get("RESEND_FROM_EMAIL", "Acelume <noreply@acelume.ng>")
     # Base URL used to build the reset-password link sent by email.
     PUBLIC_APP_URL: str = os.environ.get(
         "PUBLIC_APP_URL",
@@ -49,7 +49,7 @@ class Settings:
     # failing, same fallback pattern as RESEND_API_KEY/OPENAI_API_KEY above.
     VAPID_PRIVATE_KEY: str = os.environ.get("VAPID_PRIVATE_KEY", "")
     VAPID_PUBLIC_KEY: str = os.environ.get("VAPID_PUBLIC_KEY", "")
-    VAPID_CLAIM_EMAIL: str = os.environ.get("VAPID_CLAIM_EMAIL", "mailto:manirkhalil@gmail.com")
+    VAPID_CLAIM_EMAIL: str = os.environ.get("VAPID_CLAIM_EMAIL", "mailto:arewatutorials@gmail.com")
     # Shared secret an external cron (e.g. cron-job.org) must pass to trigger
     # /api/notifications/send-reminders -- this endpoint isn't behind normal
     # user auth since it's meant to be hit by a scheduler, not a browser.
