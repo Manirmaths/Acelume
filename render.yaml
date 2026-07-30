@@ -1,14 +1,25 @@
 services:
-  # FastAPI backend -> serves the API at api.naijaprep.com.ng.
+  # FastAPI backend -> currently serves the API at api.naijaprep.com.ng.
   #
-  # Rename history: Naija Prep -> Burina (abandoned) -> Acelume (current, and
-  # the GitHub repo name). As of 2026-07-29 the rename is code/copy only --
-  # no Acelume domain is registered yet, so every domain below is still
-  # naijaprep.com.ng and that is deliberate, not an oversight. When an Acelume
-  # domain is secured, add it as a custom domain in Render and append it to
-  # FRONTEND_ORIGINS *after* the naijaprep entries (see note below).
+  # Rename history: Naija Prep -> Burina (abandoned) -> Acelume (current).
+  # acelume.ng and acelume.com.ng were registered 2026-07-30; acelume.ng is
+  # the chosen canonical domain. Migration is deliberately PHASED:
+  #
+  #   Step 1 (done): Render services renamed to acelume-*, acelume domains
+  #                  appended to FRONTEND_ORIGINS. naijaprep.com.ng stays
+  #                  primary -- nothing user-facing changes yet.
+  #   Step 2 (todo, only after acelume.ng SSL is verified working): reorder
+  #                  FRONTEND_ORIGINS to put acelume.ng first, switch
+  #                  VITE_API_URL to api.acelume.ng, update canonical/OG
+  #                  tags + sitemap.xml + robots.txt, verify acelume.ng in
+  #                  Resend and move RESEND_FROM_EMAIL onto it.
+  #
+  # Service names below MUST match the real Render services (renamed to
+  # acelume-api / acelume-web in the dashboard on 2026-07-30) -- if they
+  # drift, a Blueprint sync creates duplicate services instead of updating
+  # the existing ones.
   - type: web
-    name: naijaprep-api
+    name: acelume-api
     runtime: python
     plan: free
     rootDir: backend
@@ -21,15 +32,17 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: FRONTEND_ORIGINS
-        # Keep the live domain FIRST: PUBLIC_APP_URL defaults to
+        # ORDER IS LOAD-BEARING. PUBLIC_APP_URL defaults to
         # FRONTEND_ORIGINS[0] when unset, and that is what builds
-        # password-reset links. Putting an unregistered domain first would
-        # silently send users reset links to a domain that does not resolve.
+        # password-reset links (auth.py) and the Paystack callback URL
+        # (payments.py). naijaprep.com.ng stays FIRST until acelume.ng is
+        # confirmed serving over HTTPS -- promoting it early would send real
+        # users reset links on a domain that does not resolve yet.
         #
-        # The burina.ng entries that used to sit here were removed on
-        # 2026-07-29 -- that domain was never registered and the name was
-        # dropped in favour of Acelume, so they were dead config.
-        value: https://naijaprep.com.ng,https://www.naijaprep.com.ng
+        # The acelume entries below are additive: they let the new domains
+        # talk to the API as soon as DNS resolves, without changing where
+        # any generated link points. That is the whole point of phasing it.
+        value: https://naijaprep.com.ng,https://www.naijaprep.com.ng,https://acelume.ng,https://www.acelume.ng,https://acelume.com.ng,https://www.acelume.com.ng
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "10080"
       - key: ENV
@@ -39,12 +52,14 @@ services:
       - key: PAYSTACK_PUBLIC_KEY
         sync: false
 
-  # React/Vite frontend -> served at naijaprep.com.ng. Service names below
-  # (naijaprep-api / naijaprep-web) are Render resource identifiers, not
-  # branding -- renaming them would recreate the services and lose their
-  # configured env vars and custom domains, so they stay as they are.
+  # React/Vite frontend -> served at naijaprep.com.ng today; acelume.ng and
+  # acelume.com.ng are added as additional custom domains during the phased
+  # migration. VITE_API_URL stays on api.naijaprep.com.ng until Step 2 --
+  # it is baked in at BUILD time, so changing it requires a redeploy, and
+  # pointing it at api.acelume.ng before that hostname has a valid cert
+  # would break every API call from the browser.
   - type: web
-    name: naijaprep-web
+    name: acelume-web
     runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
