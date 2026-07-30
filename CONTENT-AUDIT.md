@@ -17,6 +17,7 @@ sub- and superscript formatting was flattened into spaces or dropped entirely.
 | Letter **O** used where digit **0** meant | 3 questions | fixed |
 | Raw HTML tables rendering as literal tags | 14 questions | fixed via `QuestionText` |
 | Chemistry formulae with lost subscripts/charges | 174 fields / 70 questions | fixed via `tools/fix_chemistry_formulae.py` |
+| Physics + Maths lost super/subscripts | 80 fields / 36 questions | fixed via `tools/fix_physics_maths_scripts.py` |
 
 Guarded by `tools/fix_question_latex.py --check`, which runs in CI.
 

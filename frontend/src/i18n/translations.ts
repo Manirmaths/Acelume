@@ -52,10 +52,10 @@ export const translations: Record<Language, Dict> = {
     'nav.goToDashboard': 'Go to Dashboard',
 
     'home.badge': 'JAMB · WAEC · NECO · Post-UTME',
-    'home.heroTitle1': 'Your ambition.',
-    'home.heroTitle2': 'Within reach.',
+    'home.heroTitle1': 'Know your score',
+    'home.heroTitle2': 'before JAMB does.',
     'home.heroSubtitle':
-      'Acelume gives you focused subject and topic practice, an AI tutor, a full JAMB CBT mock, spaced-repetition review, and progress tracking built specifically for Nigerian students.',
+      'Over 10,000 real past questions, each with an explanation that actually teaches. Sit full CBT mocks under exam conditions, ask the AI tutor when an explanation is not enough, and watch your projected score sharpen every time you practise.',
     'home.ctaTry': 'Try 10 free questions',
     'home.ctaDashboard': 'Go to your dashboard',
     'home.ctaMock': 'Take a mock CBT',
@@ -87,6 +87,13 @@ export const translations: Record<Language, Dict> = {
     'nav.goToDashboard': 'Je zuwa Dashboard',
 
     'home.badge': 'JAMB · WAEC · NECO · Post-UTME',
+    // OUT OF DATE (2026-07-30): the English hero was rewritten to
+    // "Know your score / before JAMB does." and a new subtitle. These three
+    // Hausa strings still render the previous message ("Your ambition / It is
+    // nearly fulfilled" + the old feature list), so a Hausa speaker currently
+    // sees different copy from an English one. Needs a native-speaker pass --
+    // see HAUSA-REVIEW.md for the conventions to follow (ku form, hooked
+    // letters, darussa).
     'home.heroTitle1': 'Burin ku.',
     'home.heroTitle2': 'Ya kusa cika.',
     'home.heroSubtitle':
