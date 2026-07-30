@@ -88,7 +88,7 @@ Register a free account, take a quiz, check the dashboard for streaks/points, ma
 
 ## Native apps (Android + Windows)
 
-Both the Android app and the Windows desktop app are thin **wrappers around the live site** (`https://naijaprep.com.ng`) rather than separate bundled builds. They open a native window/WebView pointed straight at the real domain, so the existing login cookie, CORS setup, and every future site update all work exactly as they do in a browser — no separate mobile auth flow, no re-publishing the app just to ship a content change.
+Both the Android app and the Windows desktop app are thin **wrappers around the live site** (`https://acelume.ng`) rather than separate bundled builds. They open a native window/WebView pointed straight at the real domain, so the existing login cookie, CORS setup, and every future site update all work exactly as they do in a browser — no separate mobile auth flow, no re-publishing the app just to ship a content change.
 
 iOS was intentionally skipped for now (building/signing an iOS app requires Xcode on a Mac, which isn't available here) — revisit later if needed, e.g. via a cloud Mac build service like Codemagic or a GitHub Actions macOS runner.
 

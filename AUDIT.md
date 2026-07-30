@@ -156,3 +156,22 @@ All of Phases 1-6 are implemented and verified (backend tests pass; frontend: `t
   - **Android package ID stays `com.naijaprep.app`** -- the app is in Play Store closed testing, and a package ID is permanently bound to its Play Console entry once uploaded. Changing it would mean a new listing and losing existing testers. Same reasoning for the Electron `appId` (`com.naijaprep.desktop`) and the npm package name (`naijaprep-desktop`), neither of which users ever see.
   - **Render service names stay `naijaprep-api` / `naijaprep-web`** -- these are Render resource identifiers; renaming recreates the services and loses their env vars and custom domains.
   - **`naijaprep.db`** (local SQLite filename) and the `DATABASE_URL` default -- cosmetic, and renaming would orphan existing local dev databases.
+
+- **Domain migration to acelume.ng (2026-07-30)**: `acelume.ng` and `acelume.com.ng` registered; **acelume.ng chosen canonical**. Render services renamed `naijaprep-api`/`naijaprep-web` -> `acelume-api`/`acelume-web` in the dashboard, and `render.yaml` updated to match (a drifted service name makes a Blueprint sync create duplicate services instead of updating the existing ones). Done in two phases:
+
+  - *Step 1*: acelume domains added as Render custom domains and appended to `FRONTEND_ORIGINS` **after** the naijaprep entries, so nothing user-facing changed while DNS/SSL settled.
+  - *Step 2*: verified `https://acelume.ng` served with a valid cert and `https://api.acelume.ng/api/health` returned ok, **then** promoted acelume.ng to `FRONTEND_ORIGINS[0]`, switched `VITE_API_URL` to `https://api.acelume.ng`, and moved canonical/OG/Twitter URLs, `sitemap.xml`, `robots.txt`, the Electron `APP_URL`, and the privacy-policy site reference onto acelume.ng.
+
+  Facts about this setup that are easy to forget and expensive to rediscover:
+
+  - **`FRONTEND_ORIGINS` order is load-bearing.** `PUBLIC_APP_URL` is unset in production and falls back to `FRONTEND_ORIGINS[0]`; that value builds password-reset links (`auth.py`) and the Paystack callback URL (`payments.py`). Reordering that list silently redirects real user emails.
+  - **`FRONTEND_ORIGINS` may be dashboard-managed, not Blueprint-managed.** If it was ever edited directly in Render, the dashboard value wins and editing `render.yaml` has no effect. Check both.
+  - **Render's onrender.com subdomains are immutable.** Renaming a service does not change them, so the DNS CNAME targets remain `naijaprep-web.onrender.com` / `naijaprep-api.onrender.com` permanently. Only deleting and recreating the service would change them -- not worth losing env vars and domains over. Consequence: **do not disable the Render subdomain on the web service**, because the `www` CNAME resolves through it.
+  - **DNS**: apex uses an A record to `216.24.57.1` (a CNAME at the apex is invalid per spec and most `.ng` registrars offer no ALIAS/ANAME); `www` is a CNAME to the onrender host.
+  - **No host-based 301 exists.** Render static-site route rules apply to every attached domain, so `naijaprep.com.ng` serves the site rather than redirecting. SEO consolidation therefore rests on the canonical tag plus a Google Search Console Change of Address. A real redirect would need a proxy or CDN layer in front.
+  - **Users get logged out per-domain.** The JWT lives in a host-scoped cookie, so a session on naijaprep.com.ng does not carry to acelume.ng. Expected, not a bug.
+
+  Deliberately left on naijaprep.com.ng, each for a reason:
+  - **`capacitor.config.json` -> `server.url`** -- the Android app in Play Store closed testing loads that URL. Changing it needs a rebuild and a new closed-testing release; naijaprep.com.ng must stay live and serving until testers are migrated. (JSON permits no comments, hence this note.)
+  - **`RESEND_FROM_EMAIL` (`noreply@naijaprep.com.ng`)** -- Resend rejects sends from unverified domains, so this cannot move until acelume.ng is verified in Resend. Changing it early would break password-reset delivery outright. Note it is *not* declared in `render.yaml`, so production reads it from the dashboard.
+  - **Render service names / `naijaprep-desktop` npm name / `com.naijaprep.app` / `com.naijaprep.desktop`** -- infrastructure identifiers, invisible to users, costly or impossible to change.

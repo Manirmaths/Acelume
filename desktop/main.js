@@ -1,11 +1,11 @@
 // Acelume desktop shell. Like the Android wrapper, this loads the live
-// site directly (https://naijaprep.com.ng) inside an Electron BrowserWindow
+// site directly (https://acelume.ng) inside an Electron BrowserWindow
 // rather than bundling a static copy of the frontend -- so the existing
 // httpOnly auth cookie and CORS setup work exactly as they do in a normal
 // browser, and every site update is instantly live in the desktop app too.
 const { app, BrowserWindow, shell } = require('electron');
 
-const APP_URL = 'https://naijaprep.com.ng';
+const APP_URL = 'https://acelume.ng';
 
 function createWindow() {
   const win = new BrowserWindow({

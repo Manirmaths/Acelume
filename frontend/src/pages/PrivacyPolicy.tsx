@@ -11,7 +11,7 @@ export default function PrivacyPolicy() {
         <section>
           <p>
             Acelume ("we", "us", "our"), by Arewa Tutorials, provides exam-preparation practice for JAMB, WAEC,
-            NECO and Post-UTME candidates in Nigeria, via our website (naijaprep.com.ng) and our Android app.
+            NECO and Post-UTME candidates in Nigeria, via our website (acelume.ng) and our Android app.
             This policy explains what information we collect, how we use it, and the choices you have.
           </p>
         </section>

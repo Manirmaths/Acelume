@@ -8,4 +8,4 @@ Disallow: /mock-attempt/
 Disallow: /results/
 Disallow: /reset-password
 
-Sitemap: https://naijaprep.com.ng/sitemap.xml
+Sitemap: https://acelume.ng/sitemap.xml

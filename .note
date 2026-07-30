@@ -1,0 +1,36 @@
+.venv\Scripts\activate 
+
+#data
+python seed_questions.py
+#backend
+cd C:\Users\Dell\Downloads\Naija Prep\backend
+uvicorn app.main:app --reload --port 8000
+
+#frontend
+cd C:\Users\Dell\Downloads\Naija Prep\frontend
+npm run dev
+
+git add -A
+git commit -m "add more seed_questions"
+git push origin main
+
+cd "Downloads/Naija Prep"
+git push origin main
+
+cd "Downloads/Naija Prep/backend"
+python sync_questions_db.py "postgresql://neondb_owner:npg_I6zc1jJdiEyM@ep-rapid-bar-aberfahw-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+Get-Process git -ErrorAction SilentlyContinue | Stop-Process -Force
+Remove-Item .git\index.lock -Force -ErrorAction SilentlyContinue
+git add -A
+git commit -m "Phase 1: rate limiting, security headers, tests, CI"
+git push
+
+cd backend
+python -u sync_questions_db.py "postgresql://neondb_owner:npg_I6zc1jJdiEyM@ep-rapid-bar-aberfahw-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+python -u seed_lesson_notes.py "postgresql://neondb_owner:npg_I6zc1jJdiEyM@ep-rapid-bar-aberfahw-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+python -u sync_questions_db.py "sqlite:///./naijaprep.db"
+python -u seed_lesson_notes.py "sqlite:///./naijaprep.db"
+
+add skip questions

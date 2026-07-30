@@ -35,14 +35,19 @@ services:
         # ORDER IS LOAD-BEARING. PUBLIC_APP_URL defaults to
         # FRONTEND_ORIGINS[0] when unset, and that is what builds
         # password-reset links (auth.py) and the Paystack callback URL
-        # (payments.py). naijaprep.com.ng stays FIRST until acelume.ng is
-        # confirmed serving over HTTPS -- promoting it early would send real
-        # users reset links on a domain that does not resolve yet.
+        # (payments.py).
         #
-        # The acelume entries below are additive: they let the new domains
-        # talk to the API as soon as DNS resolves, without changing where
-        # any generated link points. That is the whole point of phasing it.
-        value: https://naijaprep.com.ng,https://www.naijaprep.com.ng,https://acelume.ng,https://www.acelume.ng,https://acelume.com.ng,https://www.acelume.com.ng
+        # Step 2 (2026-07-30): acelume.ng promoted to first position after
+        # verifying https://acelume.ng serves with a valid cert and
+        # https://api.acelume.ng/api/health returns ok. Password-reset links
+        # and payment callbacks now land on acelume.ng.
+        #
+        # naijaprep.com.ng entries stay in the list -- they are NOT dead
+        # weight. The Android app in Play Store closed testing still points
+        # at that domain (capacitor.config.json -> server.url), and old
+        # inbound links and search results still resolve there. Removing
+        # them would break the shipped app for existing testers.
+        value: https://acelume.ng,https://www.acelume.ng,https://acelume.com.ng,https://www.acelume.com.ng,https://naijaprep.com.ng,https://www.naijaprep.com.ng
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "10080"
       - key: ENV
@@ -52,12 +57,19 @@ services:
       - key: PAYSTACK_PUBLIC_KEY
         sync: false
 
-  # React/Vite frontend -> served at naijaprep.com.ng today; acelume.ng and
-  # acelume.com.ng are added as additional custom domains during the phased
-  # migration. VITE_API_URL stays on api.naijaprep.com.ng until Step 2 --
-  # it is baked in at BUILD time, so changing it requires a redeploy, and
-  # pointing it at api.acelume.ng before that hostname has a valid cert
-  # would break every API call from the browser.
+  # React/Vite frontend. Canonical domain is acelume.ng as of Step 2
+  # (2026-07-30); naijaprep.com.ng and acelume.com.ng remain live and serve
+  # the same build, with <link rel="canonical"> in index.html pointing search
+  # engines at acelume.ng.
+  #
+  # NOTE: Render static sites apply route rules to every attached domain, so
+  # there is no per-host 301 here -- naijaprep.com.ng serves the site rather
+  # than redirecting to acelume.ng. Consolidation therefore relies on the
+  # canonical tag plus a Change of Address in Google Search Console. A true
+  # host-based redirect would need a proxy or a DNS/CDN layer in front.
+  #
+  # VITE_API_URL is baked in at BUILD time, so this value only takes effect
+  # on the next deploy.
   - type: web
     name: acelume-web
     runtime: static
@@ -66,7 +78,7 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: https://api.naijaprep.com.ng
+        value: https://api.acelume.ng
     routes:
       - type: rewrite
         source: /*
