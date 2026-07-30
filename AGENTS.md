@@ -38,6 +38,16 @@ Do not "fix" these. Each is load-bearing:
 | `naijaprep.db`, `DATABASE_URL` SQLite default | Renaming orphans existing local dev databases. |
 | `naijaprep.com.ng` domain | The shipped Android app loads it (`capacitor.config.json` → `server.url`). Must keep serving until testers migrate. |
 
+## Active constraint (check before infrastructure changes)
+
+As of 2026-07-30 the Android app is in Play Store closed testing, working toward the
+**12 testers × 14 continuous days** requirement for production access (at 9 days). The
+shipped app is a WebView pointed at `https://naijaprep.com.ng`, so **any change that stops
+that domain serving normally can cost tester continuity and reset the counter**. No
+redirects, no DNS migration on that domain, until production access is granted. Full
+reasoning and correct sequencing in `MIGRATION-FOLLOWUPS.md`. Delete this section once
+production access is through.
+
 ## Traps that have actually bitten
 
 **Schema changes need `_PENDING_COLUMNS`.** `Base.metadata.create_all()` runs on startup but

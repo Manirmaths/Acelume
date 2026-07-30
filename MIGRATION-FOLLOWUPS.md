@@ -7,6 +7,46 @@ your closed-testing group. Task 1 is independent — do it whenever.
 
 ---
 
+## 🚦 BLOCKING CONSTRAINT — read before touching naijaprep.com.ng
+
+**As of 2026-07-30, Play Console shows: _"12 testers have currently been opted in for 9 days
+continuously"_ — 14 continuous days are required to unlock production access.**
+
+The counter measures **continuous opt-in**, so it resets if testers leave the closed test.
+The shipped Android app is a WebView pointed at `https://naijaprep.com.ng`
+(`capacitor.config.json` → `server.url`). Anything that makes that domain stop serving the
+app normally — a 301 redirect, or a botched DNS migration — shows testers a broken app,
+and frustrated testers opt out.
+
+**The trade is bad in both directions**: the upside of moving early is a few days of faster
+SEO consolidation; the downside is losing 9+ days of tester continuity and delaying
+production launch by two weeks or more.
+
+**So until the 14-day requirement is met and production access is granted:**
+
+- ❌ Do **not** add the Cloudflare 301 (Task 3 below).
+- ❌ Do **not** migrate naijaprep.com.ng nameservers to Cloudflare — not even as
+  "preparation". DNS import silently dropping a record takes the site, and therefore the
+  app, down. There is no safe partial step here.
+- ❌ Do **not** change `capacitor.config.json` → `server.url` in a shipped build.
+- ✅ Uploading new releases is fine — the counter tracks opt-in continuity, not builds.
+  Shipping the acelume.ng rebuild once the upload key reset lands does **not** reset it.
+- ✅ Everything on acelume.ng is fine — it is additive and nothing points at it yet.
+
+### Correct sequence
+
+1. **Now → day 14**: change nothing on naijaprep.com.ng. The upload key reset (see Task 2)
+   should be approved during this window anyway.
+2. **Day 14**: apply for production access.
+3. **After that**: rebuild against acelume.ng, ship to closed testing, and confirm in Play
+   Console that testers have actually received the update.
+4. **Only then**: Task 3 (Cloudflare 301 + Change of Address).
+
+Safe to do at any time, with no effect on the tester count: publish the 97 lesson notes,
+back up the upload keystore, Resend/Render config, and anything touching acelume.ng only.
+
+---
+
 ## 1. Verify acelume.ng in Resend, then move the sender address — ✅ DOMAIN VERIFIED
 
 **Status 2026-07-30**: `acelume.ng` verified in Resend on the **apex** (region Ireland,
@@ -137,7 +177,11 @@ until you can see in Play Console that the new version has actually reached your
 
 ---
 
-## 3. Add 301 redirects, then run Change of Address
+## 3. Add 301 redirects, then run Change of Address — ⛔ BLOCKED until production access
+
+**Do not start this before the 14-day tester requirement is met and the acelume.ng rebuild
+has reached testers.** See the blocking constraint at the top of this file. Everything below
+is correct, just not yet.
 
 ### Why this needs extra infrastructure
 
