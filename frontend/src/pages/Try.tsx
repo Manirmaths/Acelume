@@ -154,7 +154,20 @@ function GuestSession({ subject, onExit }: { subject: string; onExit: () => void
       </button>
 
       {!finished ? (
-        <GuestQuestionCard index={index} total={questions.length} question={questions[index]} onAnswered={onAnswered} />
+        // key= is load-bearing, not cosmetic: GuestQuestionCard keeps the
+        // visitor's choice in local `picked` state. Without a key React
+        // reuses the same instance as `index` advances, so `picked` survives
+        // into the next question -- every option renders disabled
+        // (`disabled={picked !== null}`) and pick() returns early, which made
+        // questions 2-10 unanswerable. Same reasoning as the key={subject} on
+        // GuestSession below.
+        <GuestQuestionCard
+          key={questions[index].id}
+          index={index}
+          total={questions.length}
+          question={questions[index]}
+          onAnswered={onAnswered}
+        />
       ) : (
         <Card padding="lg" className="text-center">
           <h2 className="font-display font-extrabold text-2xl text-ink-900 mb-2">

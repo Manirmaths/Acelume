@@ -1,14 +1,28 @@
 /**
- * First-increment Hausa translation (Phase 6). Deliberately narrow scope:
- * navigation, the homepage hero, and auth-page labels -- the highest-traffic
- * public-facing strings, not full app coverage. Everything not listed here
- * falls back to English automatically (see useTranslation's `t()`).
+ * Hausa translation (Phase 6). Deliberately narrow scope: navigation, the
+ * homepage hero, and auth-page labels -- the highest-traffic public-facing
+ * strings, not full app coverage. Everything not listed here falls back to
+ * English automatically (see useTranslation's `t()`).
  *
- * IMPORTANT: these Hausa strings have not been reviewed by a native speaker.
- * They're a reasonable-effort first pass, not a guarantee of accuracy --
- * education-specific terminology in particular is easy to get subtly wrong.
- * Recommend a native-speaker review pass before treating this as
- * production-complete or expanding coverage further.
+ * NATIVE-SPEAKER REVIEWED (2026-07-30). The Hausa strings below were revised
+ * by a native speaker and supersede the original machine-drafted pass. See
+ * HAUSA-REVIEW.md for what changed and why. Conventions established in that
+ * review, worth preserving when adding strings:
+ *
+ *   - Address users with the plural/polite `ku` form (`burin ku`, `muku`,
+ *     `ci gabanku`, `ɗinku`), never the gendered singular `ka`/`ki`. The
+ *     English source is genderless; masculine-singular Hausa excludes roughly
+ *     half the JAMB/WAEC candidate population.
+ *   - Where person can be avoided entirely, prefer the impersonal
+ *     construction (`An manta da password?`, `An sa wa alamar bita`).
+ *   - Use proper Boko orthography with hooked letters: ɓ ɗ ƙ ƴ. These are
+ *     distinct letters, not accents -- `bude`/`buɗe` and `dalibai`/`ɗaliban`
+ *     are not interchangeable.
+ *   - "Subject" is `darussa` consistently (not `fanni`).
+ *   - `jarrabawa` is feminine, so it takes `cikakkiyar`, not `cikakken`.
+ *   - Established English loanwords students already use (`Dashboard`,
+ *     `Password`, `Flashcards`, `Blitz`, `Imel`, `Mock`) are kept in English
+ *     deliberately -- translating them would be less clear, not more.
  */
 export type Language = 'en' | 'ha';
 
@@ -59,35 +73,35 @@ export const translations: Record<Language, Dict> = {
     'nav.dashboard': 'Dashboard',
     'nav.subjects': 'Darussa',
     'nav.learn': 'Koyo',
-    'nav.leaderboard': 'Jerin Gasa',
+    'nav.leaderboard': 'Jerin Matsayi',
     'nav.blitz': 'Blitz',
-    'nav.mock': 'Cikakken Jarrabawa',
-    'nav.studyPlanner': 'Tsarin Karatu',
-    'nav.flashcards': 'Katunan Tunani',
+    'nav.mock': 'Cikakkiyar jarrabawar gwaji (Mock)',
+    'nav.studyPlanner': 'Tsarin karatu',
+    'nav.flashcards': 'Flashcards',
     'nav.achievements': 'Nasarori',
-    'nav.review': 'Alamun Bita',
-    'nav.family': 'Iyali & Malamai',
+    'nav.review': 'An sa wa alamar bita',
+    'nav.family': 'Iyali da malamai',
     'nav.admin': 'Admin',
     'nav.login': 'Shiga',
-    'nav.getStarted': 'Fara Kyauta',
-    'nav.goToDashboard': 'Zuwa Dashboard',
+    'nav.getStarted': 'Fara kyauta',
+    'nav.goToDashboard': 'Je zuwa Dashboard',
 
     'home.badge': 'JAMB · WAEC · NECO · Post-UTME',
-    'home.heroTitle1': 'Yi karatu da hikima.',
-    'home.heroTitle2': 'Shiga jarrabawa a shirye.',
+    'home.heroTitle1': 'Burin ku.',
+    'home.heroTitle2': 'Ya kusa cika.',
     'home.heroSubtitle':
-      'Acelume na baka atisaye a kan kowane fanni da batun karatu, malamin AI, cikakkiyar jarrabawar JAMB (CBT), bita mai tazarar lokaci, da bin diddigin ci gabanka -- an tsara musamman domin daliban Najeriya.',
+      'Acelume yana samar muku da atisaye na musamman kan darussa da batutuwan karatu, malamin AI, cikakkiyar jarrabawar gwaji (Mock) ta JAMB CBT, bitar da ake maimaitawa a kan tazara, da kuma hanyar bibiyar ci gabanku—duk an tsara su musamman domin ɗaliban Najeriya.',
     'home.ctaTry': 'Gwada tambayoyi 10 kyauta',
-    'home.ctaDashboard': 'Zuwa dashboard naka',
-    'home.ctaMock': 'Yi jarrabawar CBT ta gwaji',
-    'home.ctaRegister': 'Bude asusu kyauta',
-    'home.noCard': 'Ba a bukatar bude asusu don gwada samfur -- ba a bukatar katin banki, koda yaushe.',
+    'home.ctaDashboard': 'Je zuwa Dashboard ɗinku',
+    'home.ctaMock': 'Yi jarrabawar gwaji ta CBT',
+    'home.ctaRegister': 'Yi rigista kyauta',
+    'home.noCard': 'Ba sai an yi rigista ba domin gwadawa—kuma ba a buƙatar katin banki ko kaɗan.',
 
     'auth.emailLabel': 'Imel',
-    'auth.passwordLabel': 'Kalmar sirri',
+    'auth.passwordLabel': 'Password',
     'auth.usernameLabel': 'Sunan mai amfani',
     'auth.loginButton': 'Shiga',
-    'auth.registerButton': 'Bude asusu',
-    'auth.forgotPassword': 'Ka manta da kalmar sirri?',
+    'auth.registerButton': 'Yi rigista',
+    'auth.forgotPassword': 'An manta da password?',
   },
 };
