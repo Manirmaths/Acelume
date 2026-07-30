@@ -9,6 +9,7 @@ import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import MathText from '../components/ui/MathText';
+import QuestionText from '../components/ui/QuestionText';
 
 function TutorChat({ questionId }: { questionId: number }) {
   const [open, setOpen] = useState(false);
@@ -163,9 +164,9 @@ export default function Results() {
       <div className="space-y-3">
         {data.items.map((item, i) => (
           <Card key={item.question_id} padding="md">
-            <p className="font-semibold text-ink-900 mb-2 leading-relaxed">
-              <span className="text-ink-400 font-normal">{i + 1}.</span> <MathText text={item.question_text} />
-            </p>
+            <div className="font-semibold text-ink-900 mb-2 leading-relaxed">
+              <span className="text-ink-400 font-normal">{i + 1}.</span> <QuestionText text={item.question_text} />
+            </div>
             {item.image_url && (
               <img src={item.image_url} alt="Question diagram" className="w-full max-h-56 object-contain rounded-lg border border-ink-100 mb-3 bg-ink-50" />
             )}

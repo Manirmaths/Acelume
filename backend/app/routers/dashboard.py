@@ -5,9 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import UserResponse, ReviewQuestion, Question, User, QuestionMastery
+from sqlalchemy import func
+
+from app.models import UserResponse, ReviewQuestion, Question, QuizAttempt, User, QuestionMastery
 from app.progress import compute_progress
-from app.schemas import DashboardOut, DailyGoalIn, UserOut, PracticeDay
+from app.schemas import DashboardOut, DailyGoalIn, UnfinishedAttempt, UserOut, PracticeDay
 
 DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"]
 
@@ -61,6 +63,48 @@ def get_dashboard(db: Session = Depends(get_db), user: User = Depends(get_curren
         for i in range(7)
     ]
 
+    # Best Blitz round, matching the metric on the Blitz leaderboard so the
+    # number a student sees here is the one they're ranked on.
+    blitz_best = (
+        db.query(func.max(QuizAttempt.score))
+        .filter(
+            QuizAttempt.user_id == user.id,
+            QuizAttempt.mode == "blitz",
+            QuizAttempt.finished_at.isnot(None),
+        )
+        .scalar()
+    ) or 0
+
+    # Most recent unfinished attempt, so closing a tab mid-quiz doesn't
+    # silently discard the progress. Deliberately excludes:
+    #   - blitz: a 3-minute sprint resumed hours later is meaningless
+    #   - anything older than 7 days: resurfacing a long-abandoned attempt is
+    #     noise, not a helpful nudge
+    cutoff = datetime.utcnow() - timedelta(days=7)
+    stale_free = (
+        db.query(QuizAttempt)
+        .filter(
+            QuizAttempt.user_id == user.id,
+            QuizAttempt.finished_at.is_(None),
+            QuizAttempt.mode != "blitz",
+            QuizAttempt.started_at >= cutoff,
+        )
+        .order_by(QuizAttempt.started_at.desc())
+        .first()
+    )
+    unfinished = None
+    if stale_free is not None:
+        total = len(stale_free.question_ids or [])
+        # Only worth resuming if there's actually something left to answer.
+        if total and stale_free.current_index < total:
+            unfinished = UnfinishedAttempt(
+                id=stale_free.id,
+                mode=stale_free.mode,
+                subject=stale_free.subject,
+                answered=stale_free.current_index,
+                total=total,
+            )
+
     return DashboardOut(
         points=user.points,
         current_streak=user.current_streak,
@@ -77,6 +121,8 @@ def get_dashboard(db: Session = Depends(get_db), user: User = Depends(get_curren
         due_for_review_count=due_for_review_count,
         score_estimate=score_estimate,
         practice_days=practice_days,
+        blitz_best=blitz_best,
+        unfinished_attempt=unfinished,
     )
 
 

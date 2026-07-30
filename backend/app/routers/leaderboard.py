@@ -4,13 +4,22 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import User, UserResponse, Question
+from app.models import QuizAttempt, User, UserResponse, Question
 from app.schemas import LeaderboardOut, LeaderboardEntry
 from app.subjects import SUBJECTS
 
 router = APIRouter(prefix="/api/leaderboard", tags=["leaderboard"])
 
 TOP_N = 50
+
+# Boards the client may request. "points" is lifetime cumulative points (or
+# per-subject correct answers); "blitz" is a high-score board over the 3-minute
+# Blitz sprint. They are deliberately separate: cumulative points reward
+# sustained practice and are effectively impossible for a new user to top,
+# whereas a Blitz personal best is winnable on day one. Same schema for both --
+# `points` carries whichever metric the board is about, and the client labels
+# it accordingly.
+BOARDS = ("points", "blitz")
 
 # Points-per-correct-answer, kept in sync with the +10 awarded in
 # routers/quiz.py -- used here to derive a subject-scoped "points" figure
@@ -22,12 +31,17 @@ POINTS_PER_CORRECT = 10
 @router.get("", response_model=LeaderboardOut)
 def get_leaderboard(
     subject: str | None = Query(default=None),
+    board: str = Query(default="points"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     if subject is not None and subject not in SUBJECTS:
         raise HTTPException(status_code=404, detail="Unknown subject.")
+    if board not in BOARDS:
+        raise HTTPException(status_code=404, detail="Unknown leaderboard.")
 
+    if board == "blitz":
+        return _blitz_leaderboard(db, user, subject)
     if subject is None:
         return _overall_leaderboard(db, user)
     return _subject_leaderboard(db, user, subject)
@@ -61,6 +75,66 @@ def _overall_leaderboard(db: Session, user: User) -> LeaderboardOut:
         your_rank = higher_count + 1
 
     return LeaderboardOut(entries=entries, your_rank=your_rank, your_points=user.points)
+
+
+def _blitz_best_query(db: Session, subject: str | None):
+    """Each user's best single Blitz round, optionally scoped to one subject.
+
+    Ranked on best score rather than total or average deliberately: Blitz is a
+    fixed 3-minute sprint, so a personal best is directly comparable between
+    users, while a total would just re-rank by who has played most (which the
+    points board already does) and an average would punish experimenting.
+
+    Only finished attempts count -- an abandoned round sits at whatever score
+    it reached when the student walked away, and counting those would let
+    someone farm a high score by restarting until they got easy questions.
+    """
+    q = (
+        db.query(
+            QuizAttempt.user_id.label("user_id"),
+            func.max(QuizAttempt.score).label("best_score"),
+        )
+        .filter(QuizAttempt.mode == "blitz", QuizAttempt.finished_at.isnot(None))
+    )
+    if subject is not None:
+        q = q.filter(QuizAttempt.subject == subject)
+    return q.group_by(QuizAttempt.user_id)
+
+
+def _blitz_leaderboard(db: Session, user: User, subject: str | None) -> LeaderboardOut:
+    ranked = (
+        _blitz_best_query(db, subject)
+        .order_by(func.max(QuizAttempt.score).desc(), QuizAttempt.user_id.asc())
+        .limit(TOP_N)
+        .all()
+    )
+
+    user_ids = [row.user_id for row in ranked]
+    users_by_id = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+
+    entries = []
+    for i, row in enumerate(ranked):
+        u = users_by_id.get(row.user_id)
+        if not u:
+            continue
+        entries.append(LeaderboardEntry(
+            rank=i + 1,
+            username=u.username,
+            points=row.best_score,
+            current_streak=u.current_streak,
+            is_you=(u.id == user.id),
+        ))
+
+    your_row = _blitz_best_query(db, subject).filter(QuizAttempt.user_id == user.id).first()
+    your_best = your_row.best_score if your_row else 0
+
+    if any(e.is_you for e in entries):
+        your_rank = next(e.rank for e in entries if e.is_you)
+    else:
+        sub = _blitz_best_query(db, subject).subquery()
+        your_rank = db.query(sub.c.user_id).filter(sub.c.best_score > your_best).count() + 1
+
+    return LeaderboardOut(entries=entries, your_rank=your_rank, your_points=your_best)
 
 
 def _subject_points_query(db: Session, subject: str):

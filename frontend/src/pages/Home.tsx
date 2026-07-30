@@ -9,6 +9,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Spinner from '../components/ui/Spinner';
 import MathText from '../components/ui/MathText';
+import QuestionText from '../components/ui/QuestionText';
 import useDocumentMeta from '../hooks/useDocumentMeta';
 
 const FEATURES = [
@@ -114,7 +115,7 @@ function QuestionOfTheDayCard() {
           {data.subject} · {data.topic}
         </span>
       )}
-      <MathText text={data.question_text} className="text-sm font-semibold text-ink-900 leading-relaxed block mb-4" />
+      <QuestionText text={data.question_text} className="text-sm font-semibold text-ink-900 leading-relaxed block mb-4" />
       <div className="space-y-2">
         {OPTION_KEYS.map((key) => {
           const isCorrect = picked !== null && key === data.correct_option;

@@ -9,6 +9,7 @@ import { DifficultyBadge } from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import MathText from '../components/ui/MathText';
+import QuestionText from '../components/ui/QuestionText';
 
 const STREAK_MILESTONES = [3, 5, 10, 15, 20, 25];
 
@@ -238,7 +239,9 @@ export default function Quiz() {
           <ProgressBar value={(attempt.current_index / attempt.total) * 100} />
         </div>
 
-        <p className="font-semibold text-ink-900 mb-4 leading-relaxed"><MathText text={q.question_text} /></p>
+        {/* div, not p: question text may contain a table, and a table inside
+            a <p> is invalid HTML (the browser auto-closes the paragraph). */}
+        <div className="font-semibold text-ink-900 mb-4 leading-relaxed"><QuestionText text={q.question_text} /></div>
 
         {q.image_url && (
           <img src={q.image_url} alt="Question diagram" className="w-full max-h-72 object-contain rounded-xl border border-ink-100 mb-4 bg-ink-50" />

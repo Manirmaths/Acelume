@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import MathText from '../components/ui/MathText';
+import QuestionText from '../components/ui/QuestionText';
 
 function fmtTime(s: number): string {
   const clamped = Math.max(0, Math.round(s));
@@ -272,7 +273,7 @@ export default function MockExam() {
           </Card>
         )}
 
-        <p className="font-semibold text-ink-900 mb-4 leading-relaxed"><MathText text={q.question_text} /></p>
+        <div className="font-semibold text-ink-900 mb-4 leading-relaxed"><QuestionText text={q.question_text} /></div>
 
         {q.image_url && (
           <img src={q.image_url} alt="Question diagram" className="w-full max-h-72 object-contain rounded-xl border border-ink-100 mb-4 bg-ink-50" />

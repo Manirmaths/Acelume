@@ -72,6 +72,14 @@ Good for local dev; means a missing production key looks identical to working co
 real outages were found this way — password-reset email and web push were both unconfigured
 in production for an unknown length of time while appearing fine.
 
+**Render `question_text` with `<QuestionText>`, not `<MathText>`.** 14 questions (mostly
+Accounting) carry literal `<table><tr><th>…` markup in `question_text`. `QuestionText`
+parses that markup into real React elements and passes everything else to `MathText`.
+It deliberately does **not** use `dangerouslySetInnerHTML` — question text is
+admin-editable, so injecting it as HTML would be stored XSS. Options and explanations
+have no table markup, so `MathText` remains correct for those. Note that a table cannot
+live inside a `<p>`, so question text is wrapped in `<div>` at every call site.
+
 **Math only renders inside `\( ... \)`.** `MathText` (used by Quiz, Mock, Results, Review,
 Flashcards, Home and Try) treats everything outside those delimiters as plain text, so
 `Find \int cos4 x dx` shows students raw LaTeX source. Two consequences:

@@ -190,11 +190,56 @@ export default function Dashboard() {
         </div>
       </Card>
 
+      {/* Resuming matters more than any stat below it, so it sits first.
+          Before this existed, closing the tab mid-quiz silently discarded the
+          attempt -- the QuizAttempt row survived but nothing linked to it. */}
+      {data.unfinished_attempt && (
+        <Card padding="md" className="bg-warning-50 border-warning-100 mb-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-warning-700 font-medium">
+            <i className="fa-solid fa-hourglass-half mr-1.5" />
+            You have an unfinished {data.unfinished_attempt.subject ?? 'practice'} session —{' '}
+            {data.unfinished_attempt.answered} of {data.unfinished_attempt.total} answered.
+          </p>
+          <Link
+            to={
+              data.unfinished_attempt.mode === 'mock'
+                ? `/mock-attempt/${data.unfinished_attempt.id}`
+                : `/quiz-attempt/${data.unfinished_attempt.id}`
+            }
+          >
+            <Button size="sm" icon={<i className="fa-solid fa-play" />}>Resume</Button>
+          </Link>
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard icon="fa-solid fa-star" label="Total points" value={data.points} tone="bg-brand-50 text-brand-600" />
         <StatCard icon="fa-solid fa-fire" label="Current streak" value={`${data.current_streak}d`} tone="bg-flame-500/10 text-flame-500" />
         <StatCard icon="fa-solid fa-trophy" label="Longest streak" value={`${data.longest_streak}d`} tone="bg-warning-50 text-warning-600" />
-        <StatCard icon="fa-solid fa-bookmark" label="Marked questions" value={data.review_count} tone="bg-info-50 text-info-500" />
+        <StatCard icon="fa-solid fa-bolt" label="Best Blitz" value={data.blitz_best} tone="bg-flame-500/10 text-flame-500" />
+      </div>
+
+      {/* Marked questions moved out of the stat grid to make room for Blitz:
+          it's an action, not a score, so it reads better as a link. */}
+      <div className="grid sm:grid-cols-2 gap-4 mb-6">
+        <Link to="/review" className="block">
+          <Card padding="md" className="h-full flex items-center justify-between gap-3 hover:border-brand-300 transition-colors">
+            <span className="text-sm font-semibold text-ink-700">
+              <i className="fa-solid fa-bookmark text-info-500 mr-1.5" />
+              {data.review_count} marked question{data.review_count === 1 ? '' : 's'}
+            </span>
+            <i className="fa-solid fa-chevron-right text-ink-300 text-xs" />
+          </Card>
+        </Link>
+        <Link to="/blitz" className="block">
+          <Card padding="md" className="h-full flex items-center justify-between gap-3 hover:border-brand-300 transition-colors">
+            <span className="text-sm font-semibold text-ink-700">
+              <i className="fa-solid fa-bolt text-flame-500 mr-1.5" />
+              {data.blitz_best > 0 ? `Beat your best of ${data.blitz_best}` : 'Try a 3-minute Blitz'}
+            </span>
+            <i className="fa-solid fa-chevron-right text-ink-300 text-xs" />
+          </Card>
+        </Link>
       </div>
 
       {data.due_for_review_count > 0 && (

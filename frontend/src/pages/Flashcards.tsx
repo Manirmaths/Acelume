@@ -8,6 +8,7 @@ import { Select } from '../components/ui/Input';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import MathText from '../components/ui/MathText';
+import QuestionText from '../components/ui/QuestionText';
 
 const COUNT_OPTIONS = [10, 20, 30];
 
@@ -103,7 +104,7 @@ export default function Flashcards() {
                   {card.subject} · {card.topic}
                 </span>
               )}
-              <MathText text={card.question_text} className="font-display font-bold text-lg text-ink-900 leading-relaxed" />
+              <QuestionText text={card.question_text} className="font-display font-bold text-lg text-ink-900 leading-relaxed" />
               {card.image_url && <img src={card.image_url} alt="" className="mt-4 max-h-40 object-contain" />}
               <p className="text-xs text-ink-400 mt-6">
                 <i className="fa-solid fa-rotate mr-1" /> Tap to flip

@@ -223,6 +223,20 @@ class ScoreEstimate(BaseModel):
     message: Optional[str] = None
 
 
+class UnfinishedAttempt(BaseModel):
+    """A quiz the student started but never finished, so it can be resumed.
+
+    Without this the attempt is effectively lost: nothing in the UI links back
+    to an in-progress QuizAttempt, so closing the tab mid-quiz silently threw
+    the progress away.
+    """
+    id: int
+    mode: str
+    subject: str | None
+    answered: int
+    total: int
+
+
 class DashboardOut(BaseModel):
     points: int
     current_streak: int
@@ -239,6 +253,9 @@ class DashboardOut(BaseModel):
     due_for_review_count: int = 0
     score_estimate: ScoreEstimate
     practice_days: list[PracticeDay] = []
+    # Best single Blitz round, mirroring the Blitz leaderboard metric.
+    blitz_best: int = 0
+    unfinished_attempt: UnfinishedAttempt | None = None
 
 
 class DailyGoalIn(BaseModel):

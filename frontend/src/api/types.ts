@@ -126,6 +126,16 @@ export interface Dashboard {
   due_for_review_count: number;
   score_estimate: ScoreEstimate;
   practice_days: PracticeDay[];
+  blitz_best: number;
+  unfinished_attempt: UnfinishedAttempt | null;
+}
+
+export interface UnfinishedAttempt {
+  id: number;
+  mode: string;
+  subject: string | null;
+  answered: number;
+  total: number;
 }
 
 export interface TutorAskResponse {

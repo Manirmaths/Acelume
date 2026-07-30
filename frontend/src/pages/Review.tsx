@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import MathText from '../components/ui/MathText';
+import QuestionText from '../components/ui/QuestionText';
 
 export default function Review() {
   const queryClient = useQueryClient();
@@ -38,7 +39,7 @@ export default function Review() {
         <div className="space-y-3">
           {data.map((q) => (
             <Card key={q.id} padding="md">
-              <p className="font-semibold text-ink-900 mb-2 leading-relaxed"><MathText text={q.question_text} /></p>
+              <div className="font-semibold text-ink-900 mb-2 leading-relaxed"><QuestionText text={q.question_text} /></div>
               {q.image_url && (
                 <img src={q.image_url} alt="Question diagram" className="w-full max-h-56 object-contain rounded-lg border border-ink-100 mb-3 bg-ink-50" />
               )}
