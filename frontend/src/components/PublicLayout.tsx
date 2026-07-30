@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import Button from './ui/Button';
 import LanguageSwitcher from './ui/LanguageSwitcher';
+import Logo from './ui/Logo';
 
 export default function PublicLayout() {
   const { user } = useAuth();
@@ -23,9 +24,7 @@ export default function PublicLayout() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2 font-display font-extrabold text-lg text-ink-900 flex-shrink-0">
-              <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center text-sm shadow-sm">
-                B
-              </span>
+              <Logo className="w-8 h-8 rounded-xl shadow-sm" />
               Acelume
             </Link>
 

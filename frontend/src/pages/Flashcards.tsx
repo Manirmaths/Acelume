@@ -119,7 +119,7 @@ export default function Flashcards() {
               <p className="text-xs font-bold text-brand-600 uppercase tracking-wide mb-2">Answer</p>
               <MathText text={card.answer_text} className="font-display font-extrabold text-xl text-ink-900" />
               {card.explanation && (
-                <p className="text-sm text-ink-600 mt-4 leading-relaxed">{card.explanation}</p>
+                <p className="text-sm text-ink-600 mt-4 leading-relaxed"><MathText text={card.explanation} /></p>
               )}
               <p className="text-xs text-ink-400 mt-6">
                 <i className="fa-solid fa-rotate mr-1" /> Tap to flip back

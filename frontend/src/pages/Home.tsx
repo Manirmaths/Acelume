@@ -134,7 +134,7 @@ function QuestionOfTheDayCard() {
               }`}
             >
               <span className="font-bold mr-2">{key}.</span>
-              {options[key]}
+              <MathText text={options[key]} />
             </button>
           );
         })}
@@ -142,7 +142,7 @@ function QuestionOfTheDayCard() {
       {picked && data.explanation && (
         <p className="text-xs text-ink-500 mt-4 leading-relaxed">
           <i className="fa-solid fa-circle-info mr-1" />
-          {data.explanation}
+          <MathText text={data.explanation} />
         </p>
       )}
     </Card>

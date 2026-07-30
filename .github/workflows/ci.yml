@@ -28,6 +28,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Catches malformed LaTeX in the question bank -- math outside \( \)
+      # delimiters renders as raw source to students, which is invisible to
+      # the test suite because it is a content problem, not a code one.
+      # Also guards against `\,` (thin space) reappearing in the CSV: it
+      # contains a literal comma and silently splits unquoted fields.
+      - name: Check question LaTeX
+        working-directory: .
+        run: python tools/fix_question_latex.py --check
+
       - name: Run tests
         run: python -m pytest tests/ -v
 

@@ -72,6 +72,26 @@ Good for local dev; means a missing production key looks identical to working co
 real outages were found this way — password-reset email and web push were both unconfigured
 in production for an unknown length of time while appearing fine.
 
+**Math only renders inside `\( ... \)`.** `MathText` (used by Quiz, Mock, Results, Review,
+Flashcards, Home and Try) treats everything outside those delimiters as plain text, so
+`Find \int cos4 x dx` shows students raw LaTeX source. Two consequences:
+
+- **Any new component that displays `question_text`, `option_*` or `explanation` must route
+  it through `<MathText>`.** Five components were rendering options as bare `{text}`, which
+  is why the guest `/try` page showed `\(\frac{-2}{7}\)` as literal source.
+- **Never put `\,` (LaTeX thin space) in `data/questions.csv`.** It contains a literal comma
+  and silently splits unquoted CSV fields, shifting every column after it. Use `\;`.
+  `python tools/fix_question_latex.py --check` guards both of these and runs in CI.
+
+**`$` in question text is currency, not math.** Economics and English questions contain
+`$36`, `$10,000`. `MathText`'s docstring once claimed `$$...$$` support; the regex
+deliberately does not implement it, and must not — that would turn prices into math.
+
+**Fixing `data/questions.csv` does not fix production.** The CSV is the source of truth, but
+the live Neon database is only updated by running
+`python sync_questions_db.py "<DATABASE_URL>"` from `backend/`. A content fix that is
+committed but not synced changes nothing for students.
+
 **Verify in a browser, not just via API.** A lesson-notes bug once passed every API check
 while being completely broken in the UI (infinite loop in `NoteContent.tsx`). Load the
 actual page.

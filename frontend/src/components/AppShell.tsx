@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import Avatar from './ui/Avatar';
 import LanguageSwitcher from './ui/LanguageSwitcher';
+import Logo from './ui/Logo';
 import { disablePush, enablePush, getPushState, type PushSupport } from '../lib/push';
 
 interface NavItem {
@@ -81,9 +82,7 @@ export default function AppShell() {
   const sidebarContent = (
     <div className="flex flex-col h-full">
       <Link to="/dashboard" className="flex items-center gap-2 font-display font-extrabold text-lg text-ink-900 px-5 py-5">
-        <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center text-sm shadow-sm">
-          B
-        </span>
+        <Logo className="w-8 h-8 rounded-xl shadow-sm" />
         Acelume
       </Link>
 

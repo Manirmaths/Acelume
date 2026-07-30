@@ -75,7 +75,7 @@ function GuestQuestionCard({
               }`}
             >
               <span className="font-bold mr-2">{key}.</span>
-              {options[key]}
+              <MathText text={options[key]} />
             </button>
           );
         })}
@@ -85,7 +85,7 @@ function GuestQuestionCard({
           {question.explanation && (
             <p className="text-xs text-ink-500 mt-4 leading-relaxed">
               <i className="fa-solid fa-circle-info mr-1" />
-              {question.explanation}
+              <MathText text={question.explanation} />
             </p>
           )}
           {/* Advancing is deliberately manual. This previously auto-advanced
