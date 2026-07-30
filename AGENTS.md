@@ -70,11 +70,32 @@ actual page.
 until published via Admin → Lesson notes → Publish all. A fresh database looks empty, not
 broken.
 
-**The repo lives in OneDrive.** OneDrive holds file handles on `.git/`, which causes
-recurring `.git/index.lock` failures and pushes that appear to succeed but never update the
-remote ref. If a push looks odd, check `git log --oneline -1 origin/main` before believing
-it. Pausing OneDrive sync resolves it; moving the repo out of OneDrive resolves it
-permanently.
+**Keep the repo out of OneDrive.** It previously lived in
+`C:\Users\Admin\OneDrive\Documents\Acelume`, where OneDrive held file handles on `.git/` —
+causing the recurring `.git/index.lock` failures referenced throughout `AUDIT.md`, and at
+least one push that printed "Writing objects: 100%" while never updating the remote ref.
+Relocated to **`C:\dev\Acelume`** on 2026-07-30 and the problem stopped. Do not move it back.
+
+Relocating was done by fresh `git clone`, not by moving the directory: `.venv` and
+`node_modules` are not relocatable on Windows (`pyvenv.cfg`, `Scripts\activate` and npm
+`.bin` shims all hardcode absolute paths). Only `backend/.env` and `backend/naijaprep.db`
+needed copying across, both being gitignored.
+
+**Agents: do not run `git` against this repo from a Linux container or sandbox mount.**
+Even read-only commands like `git status` create `.git/index.lock`, and a mount that lacks
+delete permission leaves it behind — the next `git` command on Windows then fails with
+`Unable to create '.git/index.lock': File exists`. Recovery is
+`Remove-Item .git\index.lock -Force`. Read files directly instead, and let the human run git.
+This produced a false `index.lock` on 2026-07-30 that looked exactly like the historical
+OneDrive problem but had a completely different cause.
+
+**Line endings differ between the old and new checkouts.** The OneDrive copy came from a
+GitHub ZIP (LF); the current clone was checked out by Git for Windows with
+`core.autocrlf=true` (CRLF in the working tree, LF in the blobs). Windows git normalises
+this and reports a clean tree. Any tool reading the working tree with a *different* autocrlf
+setting — notably a Linux container or sandbox — will see every line of every file as
+modified. That is an artifact, not a real diff: the giveaway is insertions exactly equalling
+deletions. Trust `git status` run on Windows.
 
 ## Local development
 

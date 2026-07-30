@@ -1,6 +1,6 @@
 # New laptop setup (2026-07-29)
 
-Run these in the VS Code terminal, opened at `C:\Users\Admin\OneDrive\Documents\Acelume`.
+Run these in the VS Code terminal, opened at `C:\dev\Acelume`.
 Use **PowerShell** (VS Code's default on Windows).
 
 ---
@@ -50,7 +50,7 @@ can't commit, pull, or push from it yet. Rather than cloning somewhere else (whi
 move the folder out from under Cowork), re-attach the remote in place:
 
 ```powershell
-cd C:\Users\Admin\OneDrive\Documents\Acelume
+cd C:\dev\Acelume
 git init
 git remote add origin https://github.com/<your-username>/<your-repo>.git
 git fetch origin
@@ -123,7 +123,7 @@ Leave this terminal running.
 Open a **second** terminal:
 
 ```powershell
-cd C:\Users\Admin\OneDrive\Documents\Acelume\frontend
+cd C:\dev\Acelume\frontend
 npm install
 npm run dev
 ```
