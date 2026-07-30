@@ -18,6 +18,8 @@ sub- and superscript formatting was flattened into spaces or dropped entirely.
 | Raw HTML tables rendering as literal tags | 14 questions | fixed via `QuestionText` |
 | Chemistry formulae with lost subscripts/charges | 174 fields / 70 questions | fixed via `tools/fix_chemistry_formulae.py` |
 | Physics + Maths lost super/subscripts | 80 fields / 36 questions | fixed via `tools/fix_physics_maths_scripts.py` |
+| ASCII arrows and comparison operators | 96 fields / 59 questions | fixed via `tools/fix_ascii_symbols.py` |
+| Flattened two-row tables | 13 questions | fixed via `tools/fix_flattened_tables.py` |
 
 Guarded by `tools/fix_question_latex.py --check`, which runs in CI.
 
@@ -110,7 +112,27 @@ Three distinct sub-variants, which is why this can't be regexed:
 **Chemistry is the most mechanical** (`<element> <digit>` → subscript, `<n>+`/`<n>-`
 → charge superscript) and the most visible, so it's the best place to start.
 
-### 2. Flattened tables — 73 questions
+### 2. Flattened tables — 13 done, the rest need a human
+
+Of the 73 questions that mention a table with no array, no markup and no image,
+most turned out **not to be tables at all**: "Hallowell's The Dining Table" is a poem,
+"sit round a circular table" is a permutations question, and "a table in which metals
+are arranged" describes the electrochemical series in prose.
+
+14 were genuine flattened two-row frequency tables. 13 were converted into the
+`<table>` markup `QuestionText` renders (verified: all 27 table-bearing questions in
+the bank now parse into well-formed rows and cells, no stray tags).
+
+`ACC-0483` was deliberately skipped: it has three columns (Total, P, Q) and at least
+four rows (Stock, Sales, Purchase…), so the two-row converter would have captured the
+first two rows and stranded the rest as prose — worse than leaving it. It needs
+transcribing by hand from the original paper.
+
+The remainder are wider or multi-row tables in Accounting, Economics and Geography
+where the source data may not be recoverable from the text at all. Those are candidates
+for an image, or for retirement.
+
+### Previously: flattened tables — original finding
 
 Refer to "the table" with no `\begin{array}`, no `<table>`, and no `image_url`. The
 data was pasted as prose, so the question is unanswerable.

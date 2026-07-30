@@ -33,3 +33,6 @@ cd C:\dev\Acelume\backend
 .\.venv\Scripts\Activate.ps1
 python -u sync_questions_db.py "postgresql://..."
 
+cd C:\dev\Acelume\backend; .\.venv\Scripts\Activate.ps1
+$url = Read-Host "DATABASE_URL"
+python -u sync_questions_db.py $url
