@@ -1,0 +1,45 @@
+# Daily "you haven't practiced today" push reminder.
+#
+# Render's free tier has no built-in scheduler, so POST
+# /api/notifications/send-reminders is triggered from here instead. The
+# endpoint sits outside normal user auth and is gated purely by the
+# X-Cron-Secret header matching NOTIFICATIONS_CRON_SECRET on the API.
+name: Daily practice reminders
+
+on:
+  schedule:
+    # 17:00 UTC = 18:00 WAT (Nigeria is UTC+1 year-round, no DST).
+    # GitHub cron is ALWAYS UTC and ignores repo/runner timezone.
+    - cron: "0 17 * * *"
+  # Lets you fire it manually from the Actions tab to test.
+  workflow_dispatch:
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger reminder push
+        env:
+          CRON_SECRET: ${{ secrets.NOTIFICATIONS_CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::NOTIFICATIONS_CRON_SECRET repository secret is not set."
+            exit 1
+          fi
+
+          # -sS keeps output quiet but still surfaces real errors.
+          # Capture the status separately so a 403 fails the job loudly
+          # rather than passing silently with an error body.
+          status=$(curl -sS -o response.txt -w '%{http_code}' \
+            -X POST \
+            -H "X-Cron-Secret: $CRON_SECRET" \
+            https://api.acelume.ng/api/notifications/send-reminders)
+
+          echo "HTTP $status"
+          cat response.txt
+          echo
+
+          if [ "$status" != "200" ]; then
+            echo "::error::Reminder trigger failed with HTTP $status"
+            exit 1
+          fi
