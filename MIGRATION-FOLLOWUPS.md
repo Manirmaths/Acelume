@@ -64,7 +64,31 @@ restricts in-app navigation to the configured host by default, so if you put a r
 naijaprep.com.ng *first*, the app may follow it to acelume.ng and be blocked — a blank
 screen for every existing tester.
 
-### ⚠️ Check this before anything else: do you still have the signing keystore?
+### Keystore status (resolved 2026-07-30)
+
+The original upload keystore **was lost with the previous laptop** — a filesystem-wide
+search for `*.jks` / `*.keystore` found nothing. Recovered as follows:
+
+- **Play App Signing is enrolled**, so Google holds the real app signing key
+  (SHA-1 `46:92:27:90:A2:BD:09:70:7D:14:F8:0E:45:24:8C:5B:C2:81:BC:1B`). That key is
+  unchanged and unaffected — existing installs and closed-testing releases were never at
+  risk. Only the *upload* key was lost, and only publishing was blocked.
+- A new upload keystore was generated at `C:\Users\Admin\keys\acelume-upload.jks`
+  (alias `acelume-upload`, RSA 2048, valid to 2051), and an **upload key reset was
+  requested** on 2026-07-30 with reason "I lost my upload key".
+- New upload key SHA-1: `E6:6C:A8:0A:D7:A2:D5:21:0F:A0:67:41:FC:2A:14:C6:81:4D:77:9D`.
+  **Play Console showing this fingerprint under "Upload key certificate" is the signal that
+  the reset has been approved** — until then it still displays the old `07:76:01:...`.
+
+**The new keystore and its password must be backed up off-machine.** It is deliberately
+outside the repo (so `git add -A` can never sweep it up) and outside OneDrive, which means
+without a deliberate backup it exists in exactly one place — the same single-point-of-failure
+that caused this whole exercise.
+
+Note the app signing key fingerprint above is what Firebase, Google Maps, and Google OAuth
+register against, should any of those ever be added. The upload key is irrelevant to them.
+
+### Original guidance: do you still have the signing keystore?
 
 Your previous laptop is gone. An Android app **cannot be updated** without the key it was
 signed with.
