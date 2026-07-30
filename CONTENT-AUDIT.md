@@ -16,6 +16,7 @@ sub- and superscript formatting was flattened into spaces or dropped entirely.
 | Options/explanations rendered without `MathText` | 5 components | fixed |
 | Letter **O** used where digit **0** meant | 3 questions | fixed |
 | Raw HTML tables rendering as literal tags | 14 questions | fixed via `QuestionText` |
+| Chemistry formulae with lost subscripts/charges | 174 fields / 70 questions | fixed via `tools/fix_chemistry_formulae.py` |
 
 Guarded by `tools/fix_question_latex.py --check`, which runs in CI.
 
@@ -45,7 +46,47 @@ with `<p>` wrappers changed to `<div>` since a table inside a paragraph is inval
 
 ## ❌ Outstanding, by priority
 
-### 1. Lost sub/superscripts — ~136 fields
+### Chemistry — done, with 10 questions escalated
+
+174 fields across 70 questions rewritten as `\(\mathrm{...}\)`: `Na 2 CO 3` → Na₂CO₃,
+`Ca 2+` → Ca²⁺, `Na 2 CO 3 .10H 2 O` → the decahydrate, `Ca (HCO 3 ) 2` → Ca(HCO₃)₂.
+
+Verified: all 4,776 math segments in the bank compile through real KaTeX with
+`throwOnError: true`, zero failures; CSV intact at 10,116 rows × 19 columns.
+
+The transformation is rule-based but needed five guards that are worth knowing about,
+because each one was a bug caught in review rather than a hypothetical:
+
+| Guard | Without it |
+|---|---|
+| Charge vs subscript decided by **adjacency** | `CH 3 COOC 2 H 5 + H 2 O` read the `5 +` as a charge — but that `+` is the equation's plus operator. `Ca 2+` (attached) *is* a charge. |
+| Roman-numeral groups excluded | `(II). 2NH3(g)` — I is iodine, so the list label was absorbed into the formula. |
+| Hydrate dot requires no following space | `(I). 3CuO` — the sentence period became a hydrate separator (`\cdot`). |
+| Digits followed by `.` or `%` excluded | `6.7% H 53.3% O` is percentage composition; `H 53.3%` became H₅₃. |
+| Stopword list for all-caps words | `CaCO 3 SALTS` ate the S of SALTS as sulfur. NO and IN are deliberately *not* stopwords — NO is nitric oxide, In is indium. |
+
+**10 questions were deliberately left untouched** because the chemistry itself is wrong,
+not just the formatting. Silently "correcting" these would risk teaching the wrong thing:
+
+- `CHM-0192` — glucose written `C 6 H 12 6`; the O was dropped on import.
+- `CHM-0179` — `5Fe 2+` on both sides of a redox equation (product should be Fe³⁺), and
+  `MnO - 4(aq)` has charge before subscript.
+- `CHM-0227`, `CHM-0421` — chlorine spelled `CI` with a capital i (OCR I/l confusion).
+  `CHM-0421` also looks like a duplicate of `CHM-0177`; consider retiring one.
+- `CHM-0206` — an electron configuration (`ls 2 2s 2 2P 6 3s 2 3P 2`), not a formula.
+  Subshells should be lowercase, and `ls` is OCR for `1s`.
+- `CHM-0238` — percentage composition missing a comma after `6.7% H`.
+- `CHM-0431` — `NaCO 4` is not a real compound.
+- `CHM-0437` — `CNH 2`, probably CONH₂ with the O dropped.
+- `CHM-0412` — `PH 3 CO and CO 2`, almost certainly the list `PH₃, CO and CO₂`.
+- `CHM-0453` — `Fe 3 O 4 .2H2 2 O`, malformed hydrate tail.
+
+**Known cosmetic follow-up:** within a converted question, sibling options that had no
+defect stay plain text (`AgCl`, `CuO`, `Na +`), so a multiple-choice list can mix math
+font and prose font. Readable, but untidy. Normalising those means deciding whether an
+option like "None of the above" is a formula, so it was left rather than risked.
+
+### 1. Lost sub/superscripts — remaining: Maths and Physics
 
 Formatting flattened to spaces. Needs per-question transcription; the `explanation`
 field usually disambiguates.
