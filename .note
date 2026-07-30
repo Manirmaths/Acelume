@@ -32,3 +32,4 @@ add skip questions
 cd C:\dev\Acelume\backend
 .\.venv\Scripts\Activate.ps1
 python -u sync_questions_db.py "postgresql://..."
+
