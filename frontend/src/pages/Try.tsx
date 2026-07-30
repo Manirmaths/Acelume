@@ -21,13 +21,16 @@ function GuestQuestionCard({
   total,
   question,
   onAnswered,
+  onNext,
 }: {
   index: number;
   total: number;
   question: GuestPractice['questions'][number];
   onAnswered: (correct: boolean) => void;
+  onNext: () => void;
 }) {
   const [picked, setPicked] = useState<string | null>(null);
+  const isLast = index === total - 1;
 
   const options: Record<string, string> = {
     A: question.option_a,
@@ -77,11 +80,24 @@ function GuestQuestionCard({
           );
         })}
       </div>
-      {picked && question.explanation && (
-        <p className="text-xs text-ink-500 mt-4 leading-relaxed">
-          <i className="fa-solid fa-circle-info mr-1" />
-          {question.explanation}
-        </p>
+      {picked && (
+        <>
+          {question.explanation && (
+            <p className="text-xs text-ink-500 mt-4 leading-relaxed">
+              <i className="fa-solid fa-circle-info mr-1" />
+              {question.explanation}
+            </p>
+          )}
+          {/* Advancing is deliberately manual. This previously auto-advanced
+              900ms after answering, which is far too short to read an
+              explanation -- the whole point of the feature is learning why an
+              answer is right, so the visitor decides when to move on. */}
+          <div className="mt-5 flex justify-end">
+            <Button onClick={onNext} icon={<i className="fa-solid fa-arrow-right" />}>
+              {isLast ? 'See results' : 'Next question'}
+            </Button>
+          </div>
+        </>
       )}
     </Card>
   );
@@ -144,8 +160,11 @@ function GuestSession({ subject, onExit }: { subject: string; onExit: () => void
   const onAnswered = (wasCorrect: boolean) => {
     if (wasCorrect) setCorrect((c) => c + 1);
     setAnsweredCount((c) => c + 1);
-    setTimeout(() => setIndex((i) => i + 1), 900);
   };
+
+  // Separate from onAnswered so the explanation stays on screen until the
+  // visitor is done reading it -- see the note in GuestQuestionCard.
+  const goNext = () => setIndex((i) => i + 1);
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-16">
@@ -167,6 +186,7 @@ function GuestSession({ subject, onExit }: { subject: string; onExit: () => void
           total={questions.length}
           question={questions[index]}
           onAnswered={onAnswered}
+          onNext={goNext}
         />
       ) : (
         <Card padding="lg" className="text-center">
