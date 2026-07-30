@@ -18,7 +18,10 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          # Must match .python-version (3.13). CI previously ran 3.11 while
+          # local dev ran 3.13 -- that drift means CI can pass on code that
+          # fails locally, or vice versa.
+          python-version: "3.13"
           cache: "pip"
           cache-dependency-path: backend/requirements.txt
 
