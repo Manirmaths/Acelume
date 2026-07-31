@@ -41,3 +41,7 @@ python -u sync_questions_db.py $url
 cd C:\dev\Acelume\frontend; npx tsc -b; npm run dev
 cd ..\backend; .\.venv\Scripts\Activate.ps1; pytest
 python seed_syllabus.py "sqlite:///./naijaprep.db" --reset-order
+
+
+$env:OPENAI_API_KEY = 'sk-...'
+python tools/answer_keys.py --validate data/staging/ground_truth.csv --model gpt-4o

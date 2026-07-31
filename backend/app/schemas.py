@@ -786,6 +786,12 @@ class BattleLiveOut(BaseModel):
     code: str
     started: bool
     current_index: Optional[int] = None
+    # The client MUST select the question by this id, not by indexing its own
+    # list at current_index. /questions silently omits any question deleted
+    # since the battle was created, which shortens that list and slides every
+    # later position -- so the student would be shown one question and graded
+    # on another. Positions are not a shared coordinate system; ids are.
+    current_question_id: Optional[int] = None
     seconds_remaining: Optional[int] = None
     total: int
     finished: bool

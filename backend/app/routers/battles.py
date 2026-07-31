@@ -246,6 +246,7 @@ def live_state(code: str, db: Session = Depends(get_db), user: User = Depends(ge
         db.commit()
         return BattleLiveOut(
             code=battle.code, started=False, current_index=None,
+            current_question_id=None,
             seconds_remaining=None, total=total, finished=False,
             you_answered=0, opponent_answered=0, opponent_present=False,
         )
@@ -279,6 +280,7 @@ def live_state(code: str, db: Session = Depends(get_db), user: User = Depends(ge
         code=battle.code,
         started=True,
         current_index=None if finished else index,
+        current_question_id=None if finished else battle.question_ids[index],
         seconds_remaining=seconds_remaining,
         total=total,
         finished=finished,
@@ -361,30 +363,28 @@ def live_finish(code: str, db: Session = Depends(get_db), user: User = Depends(g
     if elapsed < len(battle.question_ids) * battle.seconds_per_question:
         raise HTTPException(status_code=400, detail="This battle is still running.")
 
-    correct = 0
-    attempted = 0
-    for qid in battle.question_ids:
-        selected = (me.answers or {}).get(str(qid))
-        if not selected:
-            continue
-        attempted += 1
-        q = db.get(Question, qid)
-        if q and selected == q.correct_option:
-            correct += 1
-
-    me.score = correct
-    me.attempted = attempted
-    # Live battles are paced by a shared clock, so per-question timing carries
-    # no information -- everyone had exactly the same window. Ties therefore
-    # fall through to attempted, then to a draw.
-    me.correct_seconds = 0
-    me.submitted_at = datetime.utcnow()
+    _grade_live(db, battle, me)
 
     others = (
         db.query(BattleParticipant)
         .filter(BattleParticipant.battle_id == battle.id, BattleParticipant.user_id != user.id)
         .all()
     )
+
+    # Resolve the opponent too, once their grace window has also closed.
+    #
+    # Without this, a battle where the other phone died never settles: their
+    # submitted_at stays null, status never reaches "complete", and the student
+    # who did finish sits on "waiting for your opponent" forever. The clock is
+    # SHARED, so once it has run out their answers are final whether or not
+    # their phone is still alive -- grading them from what they already sent is
+    # exactly as valid as grading yourself, and it is the only outcome that
+    # honours "losing signal never forfeits".
+    if elapsed >= len(battle.question_ids) * battle.seconds_per_question + LIVE_GRACE_SECONDS:
+        for o in others:
+            if o.submitted_at is None:
+                _grade_live(db, battle, o)
+
     if others and all(o.submitted_at is not None for o in others):
         battle.status = "complete"
 
@@ -392,7 +392,7 @@ def live_finish(code: str, db: Session = Depends(get_db), user: User = Depends(g
         db, user=user, event_type=events.BATTLE_COMPLETED,
         event_key=f"{events.BATTLE_COMPLETED}:battle={battle.id}:user={user.id}",
         subject=battle.subject, topic=battle.topic, source_id=str(battle.id),
-        payload={"score": correct, "total": len(battle.question_ids), "mode": "live"},
+        payload={"score": me.score, "total": len(battle.question_ids), "mode": "live"},
         award_xp=False,
     )
     db.commit()
@@ -406,6 +406,28 @@ def battle_result(code: str, db: Session = Depends(get_db), user: User = Depends
 
 
 # ---------------------------------------------------------------------------
+
+
+def _grade_live(db: Session, battle: Battle, p: BattleParticipant) -> None:
+    """Score one participant of a finished live battle from their stored answers."""
+    correct = 0
+    attempted = 0
+    for qid in battle.question_ids:
+        selected = (p.answers or {}).get(str(qid))
+        if not selected:
+            continue
+        attempted += 1
+        q = db.get(Question, qid)
+        if q and selected == q.correct_option:
+            correct += 1
+
+    p.score = correct
+    p.attempted = attempted
+    # Live battles are paced by a shared clock, so per-question timing carries
+    # no information -- everyone had exactly the same window. Ties therefore
+    # fall through to attempted, then to a draw.
+    p.correct_seconds = 0
+    p.submitted_at = datetime.utcnow()
 
 
 def _require_participant(db: Session, code: str, user: User) -> tuple[Battle, BattleParticipant]:

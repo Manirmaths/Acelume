@@ -169,6 +169,41 @@ line. Seven places had this. Use `gamification/idempotency.insert_if_new()`, whi
 the undo to a SAVEPOINT. Never call `db.rollback()` inside a helper that did not open the
 transaction.
 
+**192 English comprehension questions were live with no passage.** Found by the 2025 English key
+audit, not by anyone reading the app. `data/passages.csv` holds two rows; 192 Reading
+Comprehension questions ask about a story ("What was the ritual at morning assembly at
+Stardom?") that was never imported, all with `passage_id` empty and `explanation` empty. A
+student sees exactly what the model saw — nothing — guesses, and is told nothing afterwards.
+Worse than a wrong key. Quarantined to `draft` by `tools/quarantine_orphan_questions.py`;
+they return when passages are imported. Any new comprehension or cloze content must ship
+with its passage, and the tool should be re-run after every import.
+
+**A "second opinion" from a crippled pass is noise, not evidence.** Pass A originally allowed
+8 tokens and no reasoning. On 2025 Mathematics it was right once out of the 21 questions the
+gate could not settle, while pass B was right sixteen times — so 38% of maths went undecided
+for no reason. Passes must differ by METHOD (solve forwards vs eliminate backwards, over a
+different option order), never by capability. Prompt changes bump `PROMPT_VERSION` in
+`keying_core.py`, which is part of the checkpoint filename — otherwise a resumed run silently
+reports the old prompt's numbers.
+
+**Never publish a generated answer key without measuring the error rate first.** A wrong key
+is worse than a missing one: a missing key teaches nothing, a wrong key teaches something
+false with a confident explanation attached, to a student who has no way to check it. Blind
+testing against 144 questions with verified answers put single-pass accuracy at **91.2%** —
+about 600 wrong keys across the archive if published ungated. The pipeline
+(`tools/answer_keys.py`, see CONTENT-PIPELINE.md) answers twice with the options shuffled and
+publishes only on agreement. Run `--validate` against `data/staging/ground_truth.csv` before
+any bulk run: 91% is a property of the *model*, not the pipeline. Also note two of three
+"confident errors" turned out to be arguable keys in our own bank — a disagreement flags a
+question for a human, it does not settle it.
+
+**Pydantic silently drops response fields the schema does not declare.** Adding
+`current_question_id=...` to a router's `BattleLiveOut(...)` call without also adding it to the
+schema class raised nothing — Pydantic's default `extra='ignore'` discarded it, the endpoint
+returned 200, and the field simply never appeared in the JSON. TypeScript can't catch this
+either: `types.ts` is a compile-time claim about a runtime payload. The only thing that catches
+it is a test asserting on the response body, so any new response field needs one.
+
 **League promotion and demotion zones overlap in a small cohort.** Cohorts fill to
 `COHORT_SIZE = 20` over time, so early ones are undersized by definition. With three active
 students, everyone is simultaneously in the top 5 and the bottom 3. Promotion was checked

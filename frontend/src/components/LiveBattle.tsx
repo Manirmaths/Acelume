@@ -29,6 +29,15 @@ export default function LiveBattle({ code, onFinished }: { code: string; onFinis
   const [countdown, setCountdown] = useState<number | null>(null);
   const finishing = useRef(false);
 
+  // Held in a ref so the poll effect does not depend on the callback's
+  // identity. If it did, an inline arrow from the parent would tear down and
+  // rebuild the interval on every render -- and since each rebuild polls
+  // immediately and every poll sets state, that is an unbounded request loop
+  // pointed at the API. The parent currently memoises it; this makes that a
+  // convenience rather than a load-bearing detail.
+  const onFinishedRef = useRef(onFinished);
+  onFinishedRef.current = onFinished;
+
   // Question set is fixed at creation, so it only needs fetching once.
   useEffect(() => {
     api
@@ -51,7 +60,7 @@ export default function LiveBattle({ code, onFinished }: { code: string; onFinis
           finishing.current = true;
           // Either player may finish the battle; grading is idempotent.
           await api.post(`/api/battles/${code}/live/finish`).catch(() => {});
-          onFinished();
+          onFinishedRef.current();
         }
       } catch (e) {
         // A failed poll is not an error state -- it is a bad moment on a
@@ -68,7 +77,7 @@ export default function LiveBattle({ code, onFinished }: { code: string; onFinis
       cancelled = true;
       clearInterval(id);
     };
-  }, [code, onFinished]);
+  }, [code]);
 
   // Cosmetic tick between polls so the timer doesn't visibly jump in 3s steps.
   useEffect(() => {
@@ -116,7 +125,10 @@ export default function LiveBattle({ code, onFinished }: { code: string; onFinis
   const index = state.current_index;
   if (index === null) return <Spinner className="w-8 h-8 mt-16" />;
 
-  const q = questions[index];
+  // By id, never questions[index]: /questions omits any question that has been
+  // deleted since the battle was created, which shifts every later position
+  // and would show one question while the server grades another.
+  const q = questions.find((x) => x.id === state.current_question_id);
   const picked = answered[index];
   const urgent = (countdown ?? 30) <= 5;
 
@@ -149,9 +161,16 @@ export default function LiveBattle({ code, onFinished }: { code: string; onFinis
       </div>
 
       <Card padding="lg">
-        <div className="font-semibold text-ink-900 mb-4 leading-relaxed">
-          <QuestionText text={q?.question_text} />
-        </div>
+        {q ? (
+          <div className="font-semibold text-ink-900 mb-4 leading-relaxed">
+            <QuestionText text={q.question_text} />
+          </div>
+        ) : (
+          <p className="text-sm text-ink-500 mb-4">
+            This question is unavailable. It will pass in a moment and the battle continues —
+            neither of you is scored on it.
+          </p>
+        )}
         {q?.image_url && (
           <img src={q.image_url} alt="" className="w-full max-h-56 object-contain rounded-xl border border-ink-100 mb-4" />
         )}
@@ -163,7 +182,7 @@ export default function LiveBattle({ code, onFinished }: { code: string; onFinis
               <button
                 key={key}
                 type="button"
-                disabled={!!picked}
+                disabled={!!picked || !q}
                 onClick={() => choose(index, key)}
                 aria-pressed={selected}
                 className={`w-full text-left text-sm rounded-xl border px-3.5 py-2.5 transition-colors ${

@@ -172,3 +172,67 @@ def test_reading_a_battle_reports_its_mode_without_joining_it(client, register_u
     ).count()
     assert joined == 1
     assert row.status == "open"
+
+
+def test_current_question_is_identified_by_id_not_position(client, register_user, db_session):
+    """A deleted question must not slide every later question out of alignment.
+
+    Regression. `/questions` skips any id it can no longer resolve, which makes
+    the returned list SHORTER than `battle.question_ids`. The client was
+    indexing that list at `current_index`, so after a gap it displayed one
+    question while the server graded the answer against another. Positions are
+    not a shared coordinate system between client and server; ids are.
+    """
+    register_user()
+    b = _make_live(client, db_session, questions=5)
+    row = _rewind(db_session, b["code"], 0)
+
+    # Delete the first question, as an admin tidying the bank might.
+    db_session.query(Question).filter(Question.id == row.question_ids[0]).delete()
+    db_session.commit()
+
+    # Clock sits on question index 2.
+    _rewind(db_session, b["code"], 65)
+    state = client.get(f"/api/battles/{b['code']}/live").json()
+    listed = client.get(f"/api/battles/{b['code']}/questions").json()
+
+    assert state["current_index"] == 2
+    assert len(listed) == 4, "the deleted question is absent, so positions have shifted"
+    assert state["current_question_id"] == row.question_ids[2]
+    # The naive lookup now points at the WRONG question -- which is the bug.
+    assert listed[2]["id"] != state["current_question_id"]
+    # Looking up by id still finds the right one.
+    assert any(q["id"] == state["current_question_id"] for q in listed)
+
+
+def test_abandoned_live_battle_still_resolves_for_the_player_who_finished(
+    client, register_user, db_session
+):
+    """A dead opponent phone must not leave the other student on "waiting".
+
+    The clock is shared, so once it has run out the opponent's answers are
+    final whether or not their device is still alive. Grading them from what
+    they already sent is the only outcome consistent with "losing signal never
+    forfeits".
+    """
+    register_user()
+    b = _make_live(client, db_session, questions=5)
+
+    # A second player joins, answers one question, then disappears entirely.
+    register_user(username="rival", email="rival@example.com")
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={"email": "rival@example.com", "password": "password123"})
+    client.post(f"/api/battles/{b['code']}/join")
+    _rewind(db_session, b["code"], 5)
+    client.post(f"/api/battles/{b['code']}/live/answer", json={"index": 0, "selected": "A"})
+
+    # The creator comes back after the whole battle has run out and finishes.
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={"email": "student1@example.com", "password": "password123"})
+    _rewind(db_session, b["code"], 500)
+    result = client.post(f"/api/battles/{b['code']}/live/finish").json()
+
+    assert result["opponent"] is not None
+    assert result["opponent"]["submitted"] is True, "the absent player was never scored"
+    assert result["opponent"]["score"] == 1
+    assert result["outcome"] != "waiting", "the battle never settled"

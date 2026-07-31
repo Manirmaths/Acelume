@@ -544,6 +544,8 @@ export interface BattleLive {
   code: string;
   started: boolean;
   current_index: number | null;
+  /** Select the question by THIS, never by indexing at current_index. */
+  current_question_id: number | null;
   seconds_remaining: number | null;
   total: number;
   finished: boolean;
