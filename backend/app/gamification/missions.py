@@ -16,10 +16,10 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.gamification import config, events
+from app.gamification.idempotency import insert_if_new
 from app.models import (
     DailyMission,
     DailyReward,
@@ -194,13 +194,8 @@ def generate_for_day(db: Session, user: User, local_date: date) -> list[DailyMis
             action_path=f"/learn",
         ))
 
-    for m in missions:
-        db.add(m)
-    try:
-        db.flush()
-    except IntegrityError:
+    if not insert_if_new(db, *missions):
         # Another request generated them first. Its set is as valid as ours.
-        db.rollback()
         return sorted(
             db.query(DailyMission)
             .filter(DailyMission.user_id == user.id, DailyMission.local_date == local_date)
@@ -265,11 +260,7 @@ def try_award_daily_chest(db: Session, user: User) -> int:
 
     amount = config.get(db, "xp_all_missions")
     reward = DailyReward(user_id=user.id, local_date=today, xp_awarded=amount)
-    db.add(reward)
-    try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
+    if not insert_if_new(db, reward):
         return 0
 
     events.record(

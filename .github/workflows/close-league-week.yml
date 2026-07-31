@@ -1,0 +1,58 @@
+# Settle the finished weekly league: promote the top 5, demote the bottom 3.
+#
+# Runs Monday morning, after the week it is settling has fully ended in every
+# timezone Acelume serves. Nigeria is UTC+1, so 06:00 UTC on Monday is 07:00
+# Monday locally -- comfortably past the boundary.
+#
+# Safe to re-run: close_week() only touches cohorts with closed_at IS NULL, so
+# a duplicated or manually re-triggered job cannot promote anyone twice.
+name: Close league week
+
+on:
+  schedule:
+    # 06:00 UTC every Monday. GitHub cron is always UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      week:
+        description: "Week start (YYYY-MM-DD, Monday). Blank = the week just ended."
+        required: false
+        type: string
+
+concurrency:
+  group: close-league-week
+  cancel-in-progress: false
+
+jobs:
+  close:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Close the week
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          WEEK: ${{ inputs.week }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL repository secret is not set."
+            exit 1
+          fi
+
+          if [ -n "$WEEK" ]; then
+            python -u close_league_week.py "$DATABASE_URL" --week "$WEEK"
+          else
+            python -u close_league_week.py "$DATABASE_URL"
+          fi

@@ -20,6 +20,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/subjects', labelKey: 'nav.subjects', icon: 'fa-solid fa-book-open' },
   { to: '/learn', labelKey: 'nav.learn', icon: 'fa-solid fa-graduation-cap' },
   { to: '/leaderboard', labelKey: 'nav.leaderboard', icon: 'fa-solid fa-ranking-star' },
+  { to: '/league', labelKey: 'nav.league', icon: 'fa-solid fa-shield-halved' },
+  { to: '/battles', labelKey: 'nav.battles', icon: 'fa-solid fa-people-arrows' },
   { to: '/blitz', labelKey: 'nav.blitz', icon: 'fa-solid fa-bolt' },
   { to: '/mock', labelKey: 'nav.mock', icon: 'fa-solid fa-file-signature' },
   { to: '/study-planner', labelKey: 'nav.studyPlanner', icon: 'fa-solid fa-calendar-days' },

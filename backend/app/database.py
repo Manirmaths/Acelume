@@ -65,6 +65,16 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str]]] = {
         ("league_opted_out", "BOOLEAN NOT NULL DEFAULT FALSE"),
         ("league_tier", "VARCHAR(20) NOT NULL DEFAULT 'foundation'"),
     ],
+    # `battle` is new enough that most deployments will get these from
+    # create_all(), but listing them is harmless there and essential on any
+    # instance that already shipped the async-only version of the table.
+    "battle": [
+        ("mode", "VARCHAR(10) NOT NULL DEFAULT 'async'"),
+        ("started_at", "TIMESTAMP"),
+    ],
+    "battle_participant": [
+        ("last_seen_at", "TIMESTAMP"),
+    ],
     "quiz_attempt": [
         # Plain TEXT, not a native JSON/JSONB column type -- SQLAlchemy's
         # JSON column type serializes/deserializes at the Python boundary

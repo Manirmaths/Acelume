@@ -16,10 +16,10 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.gamification import config
+from app.gamification.idempotency import insert_if_new
 from app.models import LeagueCohort, LeagueMembership, MasteryPointLedger, User
 
 # Lowest to highest.
@@ -36,6 +36,18 @@ TIER_LABELS = {
 COHORT_SIZE = 20
 PROMOTE_TOP = 5
 DEMOTE_BOTTOM = 3
+
+# Below this many active students, NOBODY is demoted.
+#
+# With a small field the promotion and demotion zones overlap: in a group of
+# three, everyone is simultaneously in the top 5 and the bottom 3. The original
+# code checked promotion first, so the top of a tiny cohort was safe -- but at
+# the highest tier, where promotion is impossible, the winner fell straight
+# through into the demotion branch and was relegated for coming first.
+#
+# This is not a hypothetical. Cohorts fill to COHORT_SIZE, so the very first
+# students on the app are all in undersized groups.
+MIN_ACTIVE_FOR_DEMOTION = PROMOTE_TOP + DEMOTE_BOTTOM + 1
 
 # event_type -> (settings key, human reason)
 POINT_RULES: dict[str, tuple[str, str]] = {
@@ -121,11 +133,7 @@ def award(db: Session, user: User, *, event_type: str, event_key: str, hard: boo
         user_id=user.id, week_start=week, amount=amount, reason=reason,
         ledger_key=f"mp:{event_key}",
     )
-    db.add(row)
-    try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
+    if not insert_if_new(db, row):
         return 0
 
     membership = ensure_membership(db, user, week)
@@ -176,12 +184,8 @@ def ensure_membership(db: Session, user: User, week_start: date) -> LeagueMember
     membership = LeagueMembership(
         user_id=user.id, cohort_id=cohort_row.id, week_start=week_start, points=0,
     )
-    db.add(membership)
-    try:
-        db.flush()
-    except IntegrityError:
+    if not insert_if_new(db, membership):
         # Concurrent first activity -- the other request's membership is fine.
-        db.rollback()
         return (
             db.query(LeagueMembership)
             .filter(LeagueMembership.user_id == user.id, LeagueMembership.week_start == week_start)
@@ -234,11 +238,15 @@ def close_week(db: Session, week_start: date) -> dict[str, int]:
             active_rank = next(
                 (i for i, (m, _) in enumerate(active, start=1) if m.id == membership.id), rank
             )
+            in_demotion_zone = (
+                len(active) >= MIN_ACTIVE_FOR_DEMOTION
+                and active_rank > len(active) - DEMOTE_BOTTOM
+            )
             if active_rank <= PROMOTE_TOP and tier_index < len(TIERS) - 1:
                 user.league_tier = TIERS[tier_index + 1]
                 membership.outcome = "promoted"
                 stats["promoted"] += 1
-            elif active_rank > max(0, len(active) - DEMOTE_BOTTOM) and tier_index > 0:
+            elif in_demotion_zone and tier_index > 0:
                 user.league_tier = TIERS[tier_index - 1]
                 membership.outcome = "demoted"
                 stats["demoted"] += 1

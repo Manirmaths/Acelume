@@ -891,3 +891,79 @@ class MasteryPointLedger(Base):
     reason: Mapped[str] = mapped_column(String(80), nullable=False)
     ledger_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Battle(Base):
+    """
+    An asynchronous head-to-head over an identical question set.
+
+    Async first, deliberately: live synchronous battles need reliable
+    reconnection and clock handling, and getting those wrong ruins a match
+    that a student cared about. Both players simply answer the same questions
+    whenever they can, and the result settles when the second finishes or the
+    invitation expires.
+
+    The question set is chosen and stored SERVER-SIDE at creation, so both
+    participants provably get the same questions and neither client can
+    influence the selection.
+    """
+    __tablename__ = "battle"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Short shareable code, so a challenge can be sent over WhatsApp without
+    # the app needing a friend graph.
+    code: Mapped[str] = mapped_column(String(12), unique=True, nullable=False, index=True)
+
+    created_by: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    topic: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    question_ids: Mapped[list] = mapped_column(JSON, nullable=False)
+    seconds_per_question: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
+
+    # async | live. Async battles are answered whenever each player likes;
+    # live battles advance on a shared server clock.
+    mode: Mapped[str] = mapped_column(String(10), default="async", nullable=False)
+    # Set when the second player joins a LIVE battle. Every deadline is derived
+    # from this one server timestamp, so no client clock can influence pacing.
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # open | complete | expired
+    status: Mapped[str] = mapped_column(String(20), default="open", nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class BattleParticipant(Base):
+    """
+    One side of a battle. Exactly one attempt each -- enforced by the UNIQUE
+    below rather than by an application check, so a retried join cannot create
+    a second attempt with a fresh score.
+
+    `answers` holds the submitted choices only. Correct answers are never sent
+    to the client until the participant has submitted, so a player cannot read
+    them out of the network response mid-battle.
+    """
+    __tablename__ = "battle_participant"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    battle_id: Mapped[int] = mapped_column(ForeignKey("battle.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+
+    answers: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    attempted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Total seconds spent on questions answered CORRECTLY. Used only to break
+    # a tie -- correctness always outranks speed.
+    correct_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Updated on every poll. Used only to show "opponent connected" -- a
+    # dropped connection must never forfeit a live battle, so this is
+    # presentational, not authoritative.
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("battle_id", "user_id", name="uq_battle_participant"),
+    )

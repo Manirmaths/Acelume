@@ -20,10 +20,10 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.gamification import config
+from app.gamification.idempotency import insert_if_new
 from app.models import LearningEvent, TopicMastery, User, XpLedger
 
 # Event types (spec: "Shared technical architecture")
@@ -116,14 +116,12 @@ def record(
         occurred_at=now,
         recorded_at=now,
     )
-    db.add(event)
-    try:
-        # Flush now so the UNIQUE constraint -- not an application-level check
-        # -- settles concurrent duplicates. Two simultaneous requests with the
-        # same key will race past the SELECT above; only one survives this.
-        db.flush()
-    except IntegrityError:
-        db.rollback()
+    # Insert inside a SAVEPOINT so the UNIQUE constraint -- not an
+    # application-level check -- settles concurrent duplicates. Two
+    # simultaneous requests with the same key race past the SELECT above; only
+    # one survives, and the loser undoes ONLY this row rather than the caller's
+    # whole transaction. See idempotency.insert_if_new.
+    if not insert_if_new(db, event):
         return None
 
     if award_xp and event_type in XP_RULES:
@@ -164,11 +162,7 @@ def _award_xp(db: Session, *, user: User, event: LearningEvent, event_type: str,
         reason=reason,
         ledger_key=f"xp:{event.event_key}",
     )
-    db.add(ledger)
-    try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
+    if not insert_if_new(db, ledger):
         return
 
     # Running total kept on User for cheap reads; the ledger is the truth.

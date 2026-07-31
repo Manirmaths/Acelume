@@ -39,6 +39,8 @@ export const translations: Record<Language, Dict> = {
     'nav.subjects': 'Subjects',
     'nav.learn': 'Learn',
     'nav.leaderboard': 'Leaderboard',
+    'nav.league': 'Weekly league',
+    'nav.battles': 'Challenges',
     'nav.blitz': 'Blitz',
     'nav.mock': 'Full Mock',
     'nav.studyPlanner': 'Study Planner',
@@ -74,6 +76,8 @@ export const translations: Record<Language, Dict> = {
     'nav.subjects': 'Darussa',
     'nav.learn': 'Koyo',
     'nav.leaderboard': 'Jerin Matsayi',
+    // Untranslated: added after the native-speaker review, so these fall back
+    // to English via t(). Needs a Hausa pass -- see HAUSA-REVIEW.md.
     'nav.blitz': 'Blitz',
     'nav.mock': 'Cikakkiyar jarrabawar gwaji (Mock)',
     'nav.studyPlanner': 'Tsarin karatu',

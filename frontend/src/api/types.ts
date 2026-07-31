@@ -466,3 +466,89 @@ export interface DailyMissions {
   reward_claimed: boolean;
   total_minutes: number;
 }
+
+export interface LeagueEntry {
+  rank: number;
+  /** Self-chosen username only — never email, school or location. */
+  username: string;
+  points: number;
+  is_you: boolean;
+  zone: 'promotion' | 'safe' | 'demotion';
+}
+
+export interface League {
+  opted_out: boolean;
+  tier: string;
+  tier_label: string;
+  week_start: string;
+  days_remaining: number;
+  your_rank: number | null;
+  your_points: number;
+  entries: LeagueEntry[];
+  promote_top: number;
+  demote_bottom: number;
+}
+
+export interface BattleQuestion {
+  id: number;
+  question_text: string;
+  image_url: string | null;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+}
+
+export interface Battle {
+  code: string;
+  subject: string;
+  topic: string | null;
+  questions: number;
+  seconds_per_question: number;
+  status: string;
+  expires_at: string;
+  players: number;
+  you_submitted: boolean;
+  mode: string;
+  started_at: string | null;
+}
+
+export interface BattleSide {
+  username: string;
+  score: number;
+  attempted: number;
+  submitted: boolean;
+  avg_correct_seconds: number | null;
+}
+
+export interface BattleReviewItem {
+  question_id: number;
+  question_text: string;
+  correct_option: string;
+  your_answer: string;
+  explanation: string | null;
+}
+
+export interface BattleResult {
+  code: string;
+  subject: string;
+  status: string;
+  mode: string;
+  outcome: 'waiting' | 'won' | 'lost' | 'draw';
+  you: BattleSide;
+  opponent: BattleSide | null;
+  review: BattleReviewItem[];
+}
+
+export interface BattleLive {
+  code: string;
+  started: boolean;
+  current_index: number | null;
+  seconds_remaining: number | null;
+  total: number;
+  finished: boolean;
+  you_answered: number;
+  opponent_answered: number;
+  /** Presentational only — a dropped connection never forfeits a battle. */
+  opponent_present: boolean;
+}

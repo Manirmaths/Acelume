@@ -15,9 +15,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.gamification.idempotency import insert_if_new
 from app.models import PersonalBest, User
 
 # Question-count bands. A 10-question quiz and a 12-question quiz are fairly
@@ -121,11 +121,7 @@ def record(
             best_attempt_id=attempt_id, best_at=datetime.utcnow(),
             baseline_pct=pct, attempts=1,
         )
-        db.add(row)
-        try:
-            db.flush()
-        except IntegrityError:
-            db.rollback()
+        if not insert_if_new(db, row):
             return None
         # The FIRST attempt is a baseline, never an achievement. Calling it a
         # personal best would make the label meaningless from the outset.

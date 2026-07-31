@@ -299,12 +299,71 @@ Privacy requirements are non-trivial and non-optional: nicknames not real names,
 opt-out that does not disable learning features, no schools or locations, no
 direct messaging.
 
-## Phase 5–6 — Quiz battles
+## Phase 5–6 — Quiz battles ✅ BUILT
 
-Asynchronous first. Needs `Battle` / `BattleParticipant`, server-selected question
-sets, and answers withheld from the client until submission — which the current
-guest-practice endpoint deliberately does *not* do (it ships `correct_option` with
-the payload). Battles cannot reuse that pattern.
+`Battle` / `BattleParticipant`, `app/routers/battles.py`, `pages/Battles.tsx`.
+
+Both async and live. Shared guarantees:
+
+- The **server selects and grades** the questions; the client never chooses.
+- **Correct answers are withheld** until that participant has submitted.
+  Note this is the opposite of the guest-practice endpoint, which deliberately
+  ships `correct_option` with the payload — battles cannot reuse that pattern.
+- **One attempt each**, enforced by a UNIQUE constraint.
+- **Invitations expire** and cannot be reused.
+- **No chat.** Codes are shareable; there is no messaging surface at all.
+
+### Async: correctness beats speed
+
+Tiebreak order is most correct → most attempted → lower average time on *correct*
+answers → draw. Speed is deliberately last: ranking on it rewards fast guessing.
+
+### Live: polling, not websockets
+
+**This is the significant design decision in Phase 6.** The obvious way to build
+"live" is a websocket. This deliberately does not.
+
+The Android app is a **WebView shell**, and its users are largely on Nigerian
+mobile networks where connections drop, stall and change IP routinely. A websocket
+turns each of those into a broken session needing detection, teardown and state
+reconciliation — and getting that wrong ruins a match a student cared about, which
+is the exact failure the spec warns about.
+
+Polling a stateless endpoint has none of that. Every response is complete and
+self-describing, so a client that vanishes for twenty seconds simply asks again and
+is told where the battle is. **A dropped connection is indistinguishable from a slow
+one**, which is the correct behaviour.
+
+The cost is a few seconds of latency on the opponent's progress indicator. The
+QUESTION timing itself is exact, because the current question is a pure function of
+`Battle.started_at` on the server:
+
+    index = (now - started_at) // seconds_per_question
+
+Both players are therefore always on the same question with no message passing, and
+no client clock can influence pacing.
+
+Consequences encoded in the endpoints:
+
+- **A dropped connection never forfeits.** `opponent_present` is presentational
+  only; answers already given still score.
+- **Answers cannot be revised**, or a player could change their mind after seeing
+  the opponent pull ahead.
+- **A grace window** accepts an answer that arrives just after its question closed —
+  a student on a slow connection should not lose an answer that left their phone in
+  time.
+- **Live battles ignore per-question timing in tiebreaks.** Everyone had exactly
+  the same window, so speed carries no information; ties fall to attempted, then draw.
+
+### School tournaments: NOT built, and blocked on a missing concept
+
+The spec's "school-versus-school" mode needs an **organisation entity** that does
+not exist in this codebase — no `School`, no membership, no verification of which
+school a student actually attends. Building tournaments without it would mean
+self-declared school names, which are unverifiable and trivially abused.
+
+That is a product decision (how are schools onboarded and verified?) before it is
+an engineering one, so it is deliberately left alone.
 
 ---
 

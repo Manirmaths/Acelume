@@ -22,6 +22,8 @@ const DeleteAccount = lazy(() => import('./pages/DeleteAccount'));
 const Subjects = lazy(() => import('./pages/Subjects'));
 const SubjectTopics = lazy(() => import('./pages/SubjectTopics'));
 const QuestMap = lazy(() => import('./pages/QuestMap'));
+const League = lazy(() => import('./pages/League'));
+const Battles = lazy(() => import('./pages/Battles'));
 const TopicHub = lazy(() => import('./pages/TopicHub'));
 const LearnHub = lazy(() => import('./pages/LearnHub'));
 const Quiz = lazy(() => import('./pages/Quiz'));
@@ -83,6 +85,9 @@ export default function App() {
           <Route path="/results/:attemptId" element={<Results />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/league" element={<League />} />
+          <Route path="/battles" element={<Battles />} />
+          <Route path="/battles/:code" element={<Battles />} />
           <Route path="/blitz" element={<Blitz />} />
           <Route path="/mock" element={<Mock />} />
           <Route path="/mock-attempt/:attemptId" element={<MockExam />} />

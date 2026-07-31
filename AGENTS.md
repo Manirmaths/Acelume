@@ -159,6 +159,24 @@ setting — notably a Linux container or sandbox — will see every line of ever
 modified. That is an artifact, not a real diff: the giveaway is insertions exactly equalling
 deletions. Trust `git status` run on Windows.
 
+**`db.rollback()` in an idempotency handler destroys the caller's transaction.** Every
+gamification write is idempotent on a key, guarded by a UNIQUE constraint. The natural
+handler — `except IntegrityError: db.rollback()` — is wrong, because `Session.rollback()`
+discards the *whole* transaction, not the failed INSERT. These functions run mid-request in
+the same session as the student's answer, so a replayed event key silently threw away the
+work that came before it: answer recorded, duplicate collides, answer gone, HTTP 200, no log
+line. Seven places had this. Use `gamification/idempotency.insert_if_new()`, which scopes
+the undo to a SAVEPOINT. Never call `db.rollback()` inside a helper that did not open the
+transaction.
+
+**League promotion and demotion zones overlap in a small cohort.** Cohorts fill to
+`COHORT_SIZE = 20` over time, so early ones are undersized by definition. With three active
+students, everyone is simultaneously in the top 5 and the bottom 3. Promotion was checked
+first, which masked it — until the top tier, where promotion is impossible and the winner
+fell through into the demotion branch and was relegated *for coming first*. Demotion now
+requires `MIN_ACTIVE_FOR_DEMOTION` active students. Any future ranking band needs the same
+question asked of it: what does this do when only two people showed up?
+
 ## Local development
 
 Full instructions in `SETUP.md`. The essentials:

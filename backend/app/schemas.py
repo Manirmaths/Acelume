@@ -706,3 +706,95 @@ class LeagueOut(BaseModel):
 
 class LeagueOptIn(BaseModel):
     opted_out: bool
+
+
+# ---------- Quiz battles ----------
+class BattleCreateIn(BaseModel):
+    subject: str
+    topic: Optional[str] = None
+    questions: int = 5  # 5 or 10
+    mode: str = "async"  # async | live
+
+
+class BattleAnswerIn(BaseModel):
+    selected: Optional[str] = None
+    seconds: Optional[int] = None
+
+
+class BattleSubmitIn(BaseModel):
+    # question_id -> answer. Graded server-side; the client's own idea of
+    # correctness is never trusted.
+    answers: dict[str, BattleAnswerIn] = {}
+
+
+class BattleQuestionOut(BaseModel):
+    """Battle question as sent BEFORE submission -- deliberately no
+    correct_option and no explanation, so neither can be read from the
+    network response mid-battle."""
+    id: int
+    question_text: str
+    image_url: Optional[str] = None
+    option_a: str
+    option_b: str
+    option_c: str
+    option_d: str
+
+
+class BattleOut(BaseModel):
+    code: str
+    subject: str
+    topic: Optional[str] = None
+    questions: int
+    seconds_per_question: int
+    status: str
+    expires_at: str
+    players: int
+    you_submitted: bool
+    mode: str = "async"
+    started_at: Optional[str] = None
+
+
+class BattleSideOut(BaseModel):
+    username: str
+    score: int
+    attempted: int
+    submitted: bool
+    avg_correct_seconds: Optional[int] = None
+
+
+class BattleResultOut(BaseModel):
+    code: str
+    subject: str
+    status: str
+    # Included so the client can tell live from async WITHOUT calling join --
+    # a read must never have the side effect of entering a battle.
+    mode: str = "async"
+    outcome: str  # waiting | won | lost | draw
+    you: BattleSideOut
+    opponent: Optional[BattleSideOut] = None
+    review: list[dict] = []
+
+
+class BattleLiveOut(BaseModel):
+    """
+    Live battle state, computed entirely from the server clock.
+
+    `current_index` and `seconds_remaining` are derived from Battle.started_at
+    rather than exchanged in messages, so both players are always on the same
+    question and no client clock can affect pacing.
+    """
+    code: str
+    started: bool
+    current_index: Optional[int] = None
+    seconds_remaining: Optional[int] = None
+    total: int
+    finished: bool
+    you_answered: int
+    opponent_answered: int
+    # Presentational only -- a dropped connection never forfeits a battle.
+    opponent_present: bool
+
+
+class BattleLiveAnswerIn(BaseModel):
+    index: int
+    selected: Optional[str] = None
