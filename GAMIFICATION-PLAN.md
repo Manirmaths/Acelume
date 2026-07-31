@@ -203,13 +203,38 @@ A **streak freeze does not apply to the Mastery streak**, on purpose. A freeze
 protects attendance; there is no honest way to protect a day on which no competence
 was demonstrated.
 
-### Still to do in Phase 2: Daily Missions
+### Daily Missions ✅ BUILT
 
-Needs a `DailyMission` table and generation respecting the spec's rules: never
-assign a locked topic, avoid three missions from one subject, keep the combined
-estimate inside 15–30 minutes. Note that last rule depends on
-`SyllabusTopic.estimated_minutes`, which is currently seeded at a flat 20 for every
-topic — mission planning will only be as good as those estimates.
+`DailyMission` / `DailyReward` tables, `gamification/missions.py`,
+`GET /api/missions`, and a card at the top of the dashboard.
+
+Three rules did most of the design work:
+
+- **Never target a locked topic.** `_available_topics()` walks the prerequisite
+  graph. A mission pointing at content the student cannot open is worse than no
+  mission — it teaches them the list is decorative. A topic already started stays
+  eligible even if its prerequisite later regresses.
+- **A new student never gets an impossible mission.** With no answer history there
+  are no mistakes to correct, so "correct 5 questions you missed" falls back to a
+  due review, then to reading a lesson.
+- **The reward is disclosed up front, never randomised.** `reward_xp` is in the
+  payload from the start; the spec rules out gambling-style mechanics.
+
+Idempotency comes from constraints, not checks: UNIQUE `(user, local_date, kind)`
+on missions and UNIQUE `(user, local_date)` on rewards. A repeated timezone flip,
+a double page load, or two concurrent requests cannot mint extra missions or pay
+the chest twice.
+
+`local_date` is the **student's** date, so missions reset at their midnight — the
+same boundary streaks use.
+
+### estimated_minutes is now derived, and still a guess
+
+`seed_syllabus.py` computes roughly 10 minutes of reading plus time proportional to
+question count, clamped to 12–45. Question count measures how heavily a topic is
+*examined*, not how long it takes to *learn*, so these are a starting point for a
+teacher to correct in the admin UI. Hand-tuned values survive re-seeding unless
+`--reset-order` is passed.
 
 ## Phase 3 — Achievements
 

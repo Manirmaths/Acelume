@@ -706,3 +706,113 @@ class SyllabusTopic(Base):
     __table_args__ = (
         UniqueConstraint("subject", "topic", name="uq_syllabus_subject_topic"),
     )
+
+
+class DailyMission(Base):
+    """
+    One of the three missions generated for a student each day.
+
+    Progress is derived, not clicked: `progress` is updated from validated
+    learning events, so a student never has to claim anything manually and a
+    replayed event cannot advance a mission twice (see gamification/missions.py).
+
+    `local_date` is the student's OWN calendar date, not the server's. Missions
+    reset at the student's midnight, which for a Lagos student is 23:00 UTC the
+    day before -- the same boundary streaks use.
+    """
+    __tablename__ = "daily_mission"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+    local_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+
+    # progress | practice | improvement -- one of each per day, so the day
+    # always contains something new, something repetitive, and something
+    # corrective rather than three of the same shape.
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    topic: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    target: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    estimated_minutes: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
+    # Deep link the client follows when the mission is tapped.
+    action_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        # One mission of each kind per student per day. This is what stops a
+        # repeated timezone change, or two concurrent requests on first load,
+        # from minting extra missions and therefore extra rewards.
+        UniqueConstraint("user_id", "local_date", "kind", name="uq_daily_mission_user_date_kind"),
+    )
+
+
+class DailyReward(Base):
+    """
+    The once-per-day chest for completing all three missions.
+
+    Its own table with a UNIQUE (user, date) rather than a flag on the user,
+    so the "exactly one reward per day" guarantee is enforced by the database
+    and survives concurrent requests.
+    """
+    __tablename__ = "daily_reward"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+    local_date: Mapped[date] = mapped_column(Date, nullable=False)
+    xp_awarded: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    claimed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "local_date", name="uq_daily_reward_user_date"),
+    )
+
+
+class PersonalBest(Base):
+    """
+    A student's best result for a *comparable* kind of activity.
+
+    The comparability key is the whole point. Without it an easier session
+    silently overwrites a harder record and the feature actively misleads --
+    a student is told they improved when they simply answered fewer, easier
+    questions. So bests are scoped to mode, subject, topic, a question-count
+    BAND and a difficulty band, and only attempts sharing all of those are
+    ever compared.
+
+    `attempts` and `baseline_pct` are kept alongside the best so the first
+    result can be reported honestly as a baseline rather than dressed up as an
+    achievement.
+    """
+    __tablename__ = "personal_best"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+
+    # Deterministic string built by gamification/personal_best.py, e.g.
+    # "quiz:Mathematics:Algebraic Processes:10-19:any".
+    activity_key: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    topic: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    best_pct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    best_correct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    best_total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    best_attempt_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    best_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    baseline_pct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "activity_key", name="uq_personal_best_user_activity"),
+    )

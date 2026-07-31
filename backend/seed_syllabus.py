@@ -86,9 +86,24 @@ ORDERED_SUBJECTS: dict[str, list[str]] = {
     ],
 }
 
-# Rough minutes for the Learn stage, used by mission planning to keep a day's
-# missions inside the spec's 15-30 minute budget.
-DEFAULT_MINUTES = 20
+def estimate_minutes(question_count: int) -> int:
+    """
+    Rough time to work through a topic, used by mission planning to keep a
+    day inside the spec's 15-30 minute budget.
+
+    A heuristic, and openly so: roughly 10 minutes to read the lesson plus
+    time proportional to how much material the topic carries, using question
+    count as the only breadth signal available. Clamped to 12-45 minutes so a
+    thin topic is not dismissed as trivial and English comprehension (742
+    questions) does not claim an hour.
+
+    Question count is a proxy for how heavily a topic is examined, not for how
+    long it takes to learn -- so these are a starting point for a teacher to
+    correct in the admin UI, not a measurement.
+    """
+    raw = 10 + question_count / 12
+    clamped = max(12, min(45, raw))
+    return int(round(clamped / 5) * 5)
 
 
 def main() -> int:
@@ -136,7 +151,7 @@ def main() -> int:
                 subject=subject,
                 topic=topic,
                 order_index=order_index,
-                estimated_minutes=DEFAULT_MINUTES,
+                estimated_minutes=estimate_minutes(q_count),
                 description=f"{q_count} practice questions available.",
             )
             db.add(row)
@@ -145,6 +160,10 @@ def main() -> int:
         else:
             if reset_order:
                 row.order_index = order_index
+                # Only re-derive the estimate on an explicit --reset-order, so
+                # a teacher's hand-tuned value is not silently overwritten by
+                # the heuristic on every re-seed.
+                row.estimated_minutes = estimate_minutes(q_count)
                 updated += 1
 
     db.flush()

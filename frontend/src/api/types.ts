@@ -431,3 +431,24 @@ export interface QuestMap {
   challenge_pass_pct: number;
   topics: QuestTopic[];
 }
+
+export interface DailyMission {
+  kind: string; // progress | practice | improvement
+  title: string;
+  subject: string | null;
+  topic: string | null;
+  target: number;
+  progress: number;
+  completed: boolean;
+  estimated_minutes: number;
+  action_path: string | null;
+}
+
+export interface DailyMissions {
+  local_date: string;
+  items: DailyMission[];
+  all_complete: boolean;
+  reward_xp: number;
+  reward_claimed: boolean;
+  total_minutes: number;
+}

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.gamification import config, events
+from app.gamification import config, events, missions, personal_best
 from app.models import Question, QuizAttempt, UserResponse, ReviewQuestion, User, QuestionMastery
 from app.schemas import (
     QuizStartIn, QuizAttemptOut, QuestionPublic, AnswerIn, AnswerOut, ResultsOut, ResultItem,
@@ -24,6 +24,34 @@ MASTERY_MODES = {"quiz", "blitz", "test_out"}
 # Modes that count as the spec's timed "Master" challenge (no hints, on the
 # clock). Only these can take a topic to three stars.
 TIMED_MODES = {"blitz"}
+
+
+def _attempt_subject_topic(db: Session, attempt: QuizAttempt) -> tuple[str | None, str | None]:
+    """The subject/topic an attempt is *about*, or (None, None) if mixed."""
+    qids = [q for q in attempt.question_ids if isinstance(q, int)]
+    if not qids:
+        return None, None
+    rows = db.query(Question.subject, Question.topic).filter(Question.id.in_(qids)).all()
+    subjects = {s for s, _ in rows if s}
+    topics = {t for _, t in rows if t}
+    return (
+        subjects.pop() if len(subjects) == 1 else None,
+        topics.pop() if len(topics) == 1 else None,
+    )
+
+
+def _record_personal_best(db: Session, user: User, attempt: QuizAttempt) -> None:
+    subject, topic = _attempt_subject_topic(db, attempt)
+    personal_best.record(
+        db,
+        user=user,
+        mode=attempt.mode,
+        subject=subject,
+        topic=topic,
+        correct=attempt.score,
+        total=len(attempt.question_ids),
+        attempt_id=attempt.id,
+    )
 
 
 def _record_topic_progress(db: Session, user: User, attempt: QuizAttempt) -> None:
@@ -279,6 +307,7 @@ def answer_quiz(attempt_id: int, payload: AnswerIn, db: Session = Depends(get_db
             event_key=f"{events.QUESTION_ANSWERED}:attempt={attempt.id}:q={question.id}",
             subject=question.subject, topic=question.topic, source_id=str(attempt.id),
         )
+        missions.advance(db, user, kind=missions.PRACTICE, subject=question.subject)
         if previously_missed:
             # Awarded once per question for life, not once per attempt --
             # otherwise a student could farm it by deliberately missing.
@@ -287,6 +316,7 @@ def answer_quiz(attempt_id: int, payload: AnswerIn, db: Session = Depends(get_db
                 event_key=f"{events.MISTAKE_CORRECTED}:q={question.id}",
                 subject=question.subject, topic=question.topic, source_id=str(attempt.id),
             )
+            missions.advance(db, user, kind=missions.IMPROVEMENT)
 
     attempt.current_index += 1
     if attempt.current_index >= len(attempt.question_ids):
@@ -302,6 +332,14 @@ def answer_quiz(attempt_id: int, payload: AnswerIn, db: Session = Depends(get_db
         if total_qs >= config.get(db, "streak_min_questions"):
             pct = round(100 * attempt.score / total_qs)
             user.record_mastery_day(pct >= config.get(db, "mastery_streak_pct"))
+
+        # Checked after every finish rather than on a schedule, so the chest
+        # appears the moment the third mission completes.
+        missions.try_award_daily_chest(db, user)
+
+        # Personal best. Recorded here (not in quiz_results) so it happens
+        # exactly once per attempt -- results can be re-fetched freely.
+        _record_personal_best(db, user, attempt)
 
         # A Smart Review session is the spec's "due review". It only counts as
         # passed at the practice threshold -- clicking through a review while
@@ -432,7 +470,55 @@ def quiz_results(attempt_id: int, db: Session = Depends(get_db), user: User = De
             explanation=q.explanation,
         ))
 
-    return ResultsOut(score=correct_count, total=len(items), items=items)
+    # Read the stored personal best rather than recomputing: recording happens
+    # once when the attempt finishes, so re-opening results can never
+    # accidentally re-file the same attempt or announce a best twice.
+    pb_out = None
+    subject, topic = _attempt_subject_topic(db, attempt)
+    key = personal_best.activity_key(
+        mode=attempt.mode, subject=subject, topic=topic,
+        total=len(attempt.question_ids), difficulty=None,
+    )
+    stored = (
+        db.query(PersonalBest)
+        .filter(PersonalBest.user_id == user.id, PersonalBest.activity_key == key)
+        .first()
+    )
+    if stored is not None and len(items):
+        pct = round(100 * correct_count / len(items))
+        is_baseline = stored.attempts <= 1
+        is_best = (not is_baseline) and pct >= stored.best_pct
+        result = personal_best.BestResult(
+            is_baseline=is_baseline,
+            is_best=is_best and pct > stored.baseline_pct,
+            current_pct=pct,
+            previous_best_pct=None if is_baseline else stored.best_pct,
+            delta_points=None if is_baseline else pct - stored.best_pct,
+            attempts=stored.attempts,
+        )
+        # Name the weakest topic so the advice points somewhere real rather
+        # than telling the student vaguely to "try harder".
+        weakest = None
+        wrong = [i for i in items if not i.is_correct]
+        if wrong:
+            by_topic: dict[str, int] = {}
+            for it in wrong:
+                q = db.get(Question, it.question_id)
+                if q and q.topic:
+                    by_topic[q.topic] = by_topic.get(q.topic, 0) + 1
+            if by_topic:
+                weakest = max(by_topic, key=by_topic.get)
+        pb_out = PersonalBestOut(
+            is_baseline=result.is_baseline,
+            is_best=result.is_best,
+            current_pct=result.current_pct,
+            previous_best_pct=result.previous_best_pct,
+            delta_points=result.delta_points,
+            attempts=result.attempts,
+            message=personal_best.message_for(result, weakest),
+        )
+
+    return ResultsOut(score=correct_count, total=len(items), items=items, personal_best=pb_out)
 
 
 @router.post("/{attempt_id}/retake-wrong", response_model=QuizAttemptOut)

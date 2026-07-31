@@ -9,6 +9,7 @@ import Button from '../components/ui/Button';
 import ProgressBar from '../components/ui/ProgressBar';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
+import DailyMissions from '../components/DailyMissions';
 
 const GOAL_PRESETS = [
   { value: 20, label: 'Casual' },
@@ -127,6 +128,11 @@ export default function Dashboard() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
       <h1 className="font-display font-extrabold text-2xl text-ink-900 mb-1">Welcome back, {user?.username}</h1>
       <p className="text-ink-500 mb-6">Here's how your practice is going.</p>
+
+      {/* Missions sit above everything else: the spec's purpose for them is
+          removing the "what should I study today?" decision, which only works
+          if they are the first thing a student sees. */}
+      <DailyMissions />
 
       {data.level && (
         <Card padding="md" className="mb-6">

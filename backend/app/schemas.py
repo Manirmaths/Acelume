@@ -192,10 +192,24 @@ class ResultItem(BaseModel):
     explanation: Optional[str] = None
 
 
+class PersonalBestOut(BaseModel):
+    """How this attempt compares with the student's best COMPARABLE attempt."""
+    is_baseline: bool
+    is_best: bool
+    current_pct: int
+    previous_best_pct: Optional[int] = None
+    # Percentage POINTS, not percent: 62% -> 74% is +12 percentage points,
+    # not a 12% improvement. Named explicitly so the UI cannot mislabel it.
+    delta_points: Optional[int] = None
+    attempts: int
+    message: str
+
+
 class ResultsOut(BaseModel):
     score: int
     total: int
     items: list[ResultItem]
+    personal_best: Optional[PersonalBestOut] = None
 
 
 # ---------- Dashboard ----------
@@ -638,3 +652,27 @@ class QuestMapOut(BaseModel):
     practice_pass_pct: int
     challenge_pass_pct: int
     topics: list[QuestTopicOut]
+
+
+# ---------- Daily missions ----------
+class DailyMissionOut(BaseModel):
+    kind: str  # progress | practice | improvement
+    title: str
+    subject: str | None = None
+    topic: str | None = None
+    target: int
+    progress: int
+    completed: bool
+    estimated_minutes: int
+    action_path: str | None = None
+
+
+class DailyMissionsOut(BaseModel):
+    local_date: str
+    items: list[DailyMissionOut]
+    all_complete: bool
+    # Disclosed up front rather than revealed on opening -- the spec rules out
+    # gambling-style reward mechanics.
+    reward_xp: int
+    reward_claimed: bool
+    total_minutes: int

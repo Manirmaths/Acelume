@@ -8,7 +8,7 @@ from app.ai import ask_note_tutor
 from app.auth import get_current_user
 from app.config import settings
 from app.database import get_db
-from app.gamification import events
+from app.gamification import events, missions
 from app.models import LessonNote, NoteFeedback, NoteProgress, NoteTutorQuery, Question, TutorQuery, User
 from app.schemas import (
     LearnHubOut, LearnSubjectProgress, LessonNoteOut, NoteFeedbackIn, NoteTutorAskIn, NoteTutorAskOut,
@@ -112,6 +112,11 @@ def mark_read(subject: str, topic: str, db: Session = Depends(get_db), user: Use
             event_key=f"{events.LESSON_COMPLETED}:{note.subject}:{note.topic}",
             subject=note.subject, topic=note.topic, source_id=str(note.id),
         )
+        # A lesson satisfies either the progress mission or the improvement
+        # mission, depending on which the generator issued today.
+        missions.advance(db, user, kind=missions.PROGRESS, subject=note.subject)
+        missions.advance(db, user, kind=missions.IMPROVEMENT, subject=note.subject)
+        missions.try_award_daily_chest(db, user)
         db.commit()
     return _note_out(db, note, user)
 
