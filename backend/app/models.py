@@ -448,3 +448,150 @@ class NoteTutorQuery(Base):
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
     topic: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ---------------------------------------------------------------------------
+# Gamification foundation (Phase 0)
+#
+# One server-authoritative event ledger that every gamification feature reads
+# from, rather than each feature recomputing progress its own way. See
+# GAMIFICATION-PLAN.md for how the eight planned features sit on top of this.
+# ---------------------------------------------------------------------------
+
+
+class LearningEvent(Base):
+    """
+    Append-only log of validated learning activity. This is the single source
+    of truth for XP, mastery, missions, leagues, streaks and achievements.
+
+    Why a ledger rather than incrementing counters: a counter cannot be
+    audited, cannot be replayed after a bug, and cannot answer "was this
+    already rewarded?". `event_key` makes every write idempotent -- the same
+    real-world action (answering question 42 in attempt 7) always produces the
+    same key, so a retried request, a double-tapped button, or a re-synced
+    offline queue can never be rewarded twice.
+
+    Rows are never updated in place. To undo something, write a reversal row
+    and set `reversed_at` on the original.
+    """
+    __tablename__ = "learning_event"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+
+    # LESSON_COMPLETED | QUESTION_ANSWERED | MISTAKE_CORRECTED | PRACTICE_COMPLETED
+    # | TOPIC_PROFICIENT | TOPIC_MASTERED | REVIEW_COMPLETED | MOCK_COMPLETED
+    # | MISSION_COMPLETED | BATTLE_COMPLETED
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+
+    # Deterministic natural key, e.g. "QUESTION_ANSWERED:attempt=7:q=42".
+    # UNIQUE -- this is the idempotency guarantee, enforced by the database
+    # rather than by application checks that race under concurrency.
+    event_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+
+    subject: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    topic: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+    # Free-form result data (score, accuracy, duration, difficulty...). JSON so
+    # new event types don't need a migration for each new field.
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+    # Client-supplied for offline sync; the SERVER timestamp is what counts for
+    # streaks and league weeks, so a device with a wrong clock cannot cheat.
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    reversed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class XpLedger(Base):
+    """
+    Append-only XP transactions. `User.points` stays as the fast running total,
+    but this table is the auditable record behind it.
+
+    XP only ever goes up (the spec is explicit: a wrong answer must never cost
+    XP), so the only negative rows here are deliberate reversals of invalidated
+    activity -- e.g. a mock that was abandoned and later voided.
+    """
+    __tablename__ = "xp_ledger"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+    event_id: Mapped[int | None] = mapped_column(ForeignKey("learning_event.id"), nullable=True)
+
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(String(80), nullable=False)
+    # Mirrors LearningEvent.event_key so XP is idempotent independently of the
+    # event write -- an event can legitimately grant XP from more than one rule.
+    ledger_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+class TopicMastery(Base):
+    """
+    Per-user, per-topic state driving the Quest Map.
+
+    Distinct from QuestionMastery, which is per-QUESTION Leitner scheduling.
+    That answers "when should this student see this question again?"; this
+    answers "does this student understand this topic?". Both are needed and
+    neither replaces the other.
+
+    `mastery_score` can go DOWN (it measures current understanding), while XP
+    never does. Keeping them in separate tables is what stops a student looking
+    academically strong purely from accumulated XP.
+    """
+    __tablename__ = "topic_mastery"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    topic: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # locked | available | learning | practising | proficient | mastered | review_due
+    state: Mapped[str] = mapped_column(String(20), default="available", nullable=False)
+
+    # 0-100, current understanding. Decays via review scheduling.
+    mastery_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # 0-3: lesson done / proficient / mastered.
+    stars: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    lesson_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    proficient_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    mastered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    practice_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    best_practice_pct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    best_challenge_pct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # Spaced review at the TOPIC level (3/7/21/45 days by default). Separate
+    # from QuestionMastery.next_review_at, which schedules individual questions.
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_review_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    review_stage: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "subject", "topic", name="uq_topic_mastery_user_topic"),
+    )
+
+
+class GamificationSetting(Base):
+    """
+    Admin-editable thresholds and reward values.
+
+    The spec requires these to be changeable without shipping a new build --
+    which matters more here than usual, because the Android app is a WebView
+    shell whose users may be on an old release. Code reads through
+    app/gamification/config.py, which falls back to documented defaults when a
+    key is absent, so an empty table behaves exactly like the hard-coded values.
+    """
+    __tablename__ = "gamification_setting"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    value: Mapped[int] = mapped_column(Integer, nullable=False)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

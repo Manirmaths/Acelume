@@ -48,6 +48,30 @@ redirects, no DNS migration on that domain, until production access is granted. 
 reasoning and correct sequencing in `MIGRATION-FOLLOWUPS.md`. Delete this section once
 production access is through.
 
+## Gamification: three measurements that must stay separate
+
+`backend/app/gamification/` is the foundation for the eight planned gamification
+features (see `GAMIFICATION-PLAN.md`). The one rule that must not be broken:
+
+| Measurement | Table | Can decrease? |
+|---|---|---|
+| Understanding | `TopicMastery.mastery_score` | **Yes** |
+| Participation | `XpLedger` / `User.points` | **Never** |
+| League position | Mastery Points (weekly, not built yet) | Resets weekly |
+
+Conflating them is what lets a student look academically strong purely from time
+spent, which the spec exists to prevent.
+
+**All rewards go through `events.record()`.** It is idempotent on a UNIQUE
+`event_key`, enforced by the database rather than an application check — an
+application check races, since two concurrent requests both SELECT nothing and
+both INSERT. Do not add reward logic that bypasses it, or offline re-syncs and
+double-taps will double-award.
+
+Note `TopicMastery` (per topic: "do they understand this?") is deliberately
+distinct from the older `QuestionMastery` (per question: "when should they see
+this again?"). Both are needed; neither replaces the other.
+
 ## Traps that have actually bitten
 
 **Schema changes need `_PENDING_COLUMNS`.** `Base.metadata.create_all()` runs on startup but
