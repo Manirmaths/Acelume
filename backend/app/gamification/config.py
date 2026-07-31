@@ -23,7 +23,13 @@ from app.models import GamificationSetting
 # ---------------------------------------------------------------------------
 DEFAULTS: dict[str, int] = {
     "xp_lesson_completed": 20,
-    "xp_correct_answer": 2,
+    # The spec suggests 2, but this app already awarded 10 points per correct
+    # answer before the ledger existed, and User.daily_goal (default 50), the
+    # dashboard XP ring and the points leaderboard are all calibrated to that.
+    # Keeping 10 means introducing the ledger changes nothing for existing
+    # students; retuning to the spec's economy is a settings change plus a
+    # matching daily_goal migration, not a code change.
+    "xp_correct_answer": 10,
     "xp_mistake_corrected": 5,
     "xp_review_passed": 25,
     "xp_topic_proficient": 30,

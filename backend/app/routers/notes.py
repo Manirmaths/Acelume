@@ -8,6 +8,7 @@ from app.ai import ask_note_tutor
 from app.auth import get_current_user
 from app.config import settings
 from app.database import get_db
+from app.gamification import events
 from app.models import LessonNote, NoteFeedback, NoteProgress, NoteTutorQuery, Question, TutorQuery, User
 from app.schemas import (
     LearnHubOut, LearnSubjectProgress, LessonNoteOut, NoteFeedbackIn, NoteTutorAskIn, NoteTutorAskOut,
@@ -98,6 +99,19 @@ def mark_read(subject: str, topic: str, db: Session = Depends(get_db), user: Use
     )
     if not existing:
         db.add(NoteProgress(user_id=user.id, note_id=note.id))
+        # First star on the Quest Map: the Learn stage is complete. Keyed on
+        # subject/topic rather than the note id so re-reading, or an admin
+        # replacing the note, cannot re-award it.
+        row = events.get_or_create_topic(db, user.id, note.subject, note.topic)
+        if row.lesson_completed_at is None:
+            row.lesson_completed_at = datetime.utcnow()
+            row.stars = max(row.stars, 1)
+            events.refresh_state(db, row)
+        events.record(
+            db, user=user, event_type=events.LESSON_COMPLETED,
+            event_key=f"{events.LESSON_COMPLETED}:{note.subject}:{note.topic}",
+            subject=note.subject, topic=note.topic, source_id=str(note.id),
+        )
         db.commit()
     return _note_out(db, note, user)
 

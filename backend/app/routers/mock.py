@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.config import settings
 from app.database import get_db
+from app.gamification import events
 from app.models import Question, QuestionMastery, QuizAttempt, User, UserResponse
 from app.routers.payments import free_mock_exams_used
 from app.schemas import (
@@ -213,7 +214,13 @@ def mock_submit(attempt_id: int, db: Session = Depends(get_db), user: User = Dep
         is_correct = bool(r and r.is_correct)
         if is_correct:
             correct_count += 1
-            user.points += 10
+            # Ledger-backed so a resubmitted mock cannot re-award. Keyed on
+            # attempt + question, matching the quiz flow.
+            events.record(
+                db, user=user, event_type=events.QUESTION_ANSWERED,
+                event_key=f"{events.QUESTION_ANSWERED}:attempt={attempt.id}:q={qid}",
+                source_id=str(attempt.id),
+            )
 
         mastery = (
             db.query(QuestionMastery)
@@ -228,6 +235,15 @@ def mock_submit(attempt_id: int, db: Session = Depends(get_db), user: User = Dep
     attempt.score = correct_count
     attempt.finished_at = datetime.utcnow()
     user.record_practice()
+
+    # Completion bonus for the exam as a whole, separate from the per-question
+    # XP above. Guarded by the attempt id so it can only ever fire once.
+    events.record(
+        db, user=user, event_type=events.MOCK_COMPLETED,
+        event_key=f"{events.MOCK_COMPLETED}:attempt={attempt.id}",
+        source_id=str(attempt.id),
+        payload={"score": correct_count, "total": len(attempt.question_ids)},
+    )
     db.commit()
 
     return quiz_results(attempt_id, db, user)

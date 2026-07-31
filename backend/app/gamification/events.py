@@ -202,6 +202,98 @@ def schedule_next_review(db: Session, row: TopicMastery, now: datetime | None = 
     row.review_stage = min(row.review_stage + 1, len(REVIEW_INTERVAL_KEYS) - 1)
 
 
+def record_practice_result(
+    db: Session,
+    *,
+    user: User,
+    subject: str,
+    topic: str,
+    correct: int,
+    total: int,
+    attempt_id: int,
+    timed: bool,
+) -> list[str]:
+    """
+    Fold a finished single-topic attempt into that topic's mastery, promoting
+    it to proficient or mastered if the thresholds are met.
+
+    Returns the milestones reached, so the caller can surface them in the UI.
+
+    Only single-topic attempts count. A mixed-topic quiz says nothing reliable
+    about any one topic, and crediting it would let a student "master" a topic
+    they barely touched.
+
+    The Master stage requires a TIMED attempt (spec: timed challenge, no
+    hints); an untimed practice run can reach proficient but never mastered,
+    however high the score.
+    """
+    if total <= 0:
+        return []
+
+    pct = round(100 * correct / total)
+    row = get_or_create_topic(db, user.id, subject, topic)
+    row.practice_attempts += 1
+    milestones: list[str] = []
+
+    min_practice = config.get(db, "practice_min_questions")
+    pass_practice = config.get(db, "practice_pass_pct")
+    min_challenge = config.get(db, "challenge_min_questions")
+    pass_challenge = config.get(db, "challenge_pass_pct")
+
+    if total >= min_practice:
+        row.best_practice_pct = max(row.best_practice_pct, pct)
+    if timed and total >= min_challenge:
+        row.best_challenge_pct = max(row.best_challenge_pct, pct)
+
+    # mastery_score tracks CURRENT understanding, so it follows the latest
+    # attempt rather than the best one -- it is allowed to fall.
+    row.mastery_score = pct
+
+    now = datetime.utcnow()
+
+    if (
+        row.proficient_at is None
+        and total >= min_practice
+        and pct >= pass_practice
+    ):
+        row.proficient_at = now
+        row.stars = max(row.stars, 2)
+        milestones.append(TOPIC_PROFICIENT)
+        record(
+            db, user=user, event_type=TOPIC_PROFICIENT,
+            event_key=f"{TOPIC_PROFICIENT}:{subject}:{topic}",
+            subject=subject, topic=topic, source_id=str(attempt_id),
+            payload={"pct": pct, "questions": total},
+        )
+
+    if (
+        row.mastered_at is None
+        and timed
+        and total >= min_challenge
+        and pct >= pass_challenge
+    ):
+        row.mastered_at = now
+        row.stars = 3
+        # Proficiency is implied by mastery -- a student who masters a topic
+        # without a separate practice run should not be stuck on two stars.
+        if row.proficient_at is None:
+            row.proficient_at = now
+        milestones.append(TOPIC_MASTERED)
+        record(
+            db, user=user, event_type=TOPIC_MASTERED,
+            event_key=f"{TOPIC_MASTERED}:{subject}:{topic}",
+            subject=subject, topic=topic, source_id=str(attempt_id),
+            payload={"pct": pct, "questions": total},
+        )
+        schedule_next_review(db, row, now)
+    elif row.mastered_at is not None:
+        # A mastered topic practised again counts as a completed review.
+        schedule_next_review(db, row, now)
+
+    refresh_state(db, row, now)
+    return milestones
+
+
 def refresh_state(db: Session, row: TopicMastery, now: datetime | None = None) -> str:
     """
     Recompute the topic's state from its stored evidence.

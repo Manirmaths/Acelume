@@ -79,19 +79,44 @@ This matters more here than usual: the Android app is a **WebView shell**, so
 students may be on an old release for weeks. Tuning a threshold must never
 require an app update.
 
-### Next step to make Phase 0 live
+### Wiring ✅ BUILT
 
-`record()` is not yet called from anywhere. Wiring it in is deliberately a
-separate commit so the schema can land first:
+`record()` is called from four places, and the legacy `user.points += 10` is gone
+from both sites that had it — XP now flows only through the ledger.
 
-1. `routers/quiz.py::answer_quiz` → `QUESTION_ANSWERED`, plus `MISTAKE_CORRECTED`
-   when the question was previously missed (join `QuestionMastery`).
-2. `routers/notes.py::mark_read` → `LESSON_COMPLETED`.
-3. `routers/mock.py::submit` → `MOCK_COMPLETED`.
-4. `routers/smart_review.py` finish → `REVIEW_COMPLETED`.
+| Call site | Events |
+|---|---|
+| `quiz.py::answer_quiz` | `QUESTION_ANSWERED`, `MISTAKE_CORRECTED` |
+| `quiz.py` on attempt finish | `TOPIC_PROFICIENT`, `TOPIC_MASTERED`, `REVIEW_COMPLETED` |
+| `mock.py::mock_submit` | `QUESTION_ANSWERED` per question, `MOCK_COMPLETED` once |
+| `notes.py::mark_read` | `LESSON_COMPLETED` (first star) |
 
-Suggested keys: `"QUESTION_ANSWERED:attempt={id}:q={qid}"`,
-`"LESSON_COMPLETED:{subject}:{topic}"`, `"MOCK_COMPLETED:attempt={id}"`.
+### The XP-value decision
+
+`xp_correct_answer` is set to **10, not the spec's suggested 2**. The app already
+awarded 10 points per correct answer, and `User.daily_goal` (default 50), the
+dashboard XP ring and the points leaderboard are all calibrated to it. The spec's
+value would silently turn the daily goal from 5 correct answers into 25 for every
+existing student. Retuning to the spec's economy is a settings change plus a
+`daily_goal` migration — deliberately deferred, not forgotten.
+
+### Rules encoded at the call sites
+
+- **Mixed-topic attempts credit no topic.** A quiz spanning Algebra and Calculus
+  is not evidence about either; crediting it would let a student "master" a topic
+  they barely touched. Only single-topic attempts fold into `TopicMastery`.
+- **Only timed modes can reach three stars.** The spec's Master stage is a timed
+  challenge, so Blitz qualifies and ordinary practice does not, however high the
+  score. `MASTERY_MODES` / `TIMED_MODES` in `quiz.py` control this.
+- **`MISTAKE_CORRECTED` is keyed per question for life** (`MISTAKE_CORRECTED:q={id}`),
+  not per attempt — otherwise a student could farm it by deliberately missing.
+- **Diagnostic and "marked" modes never grant mastery.** A diagnostic samples every
+  subject shallowly; "marked" replays questions the student already flagged.
+- **A Smart Review only counts as passed at `practice_pass_pct`.** Clicking through
+  a review while getting most of it wrong is not retention.
+- **`mastery_score` follows the LATEST attempt, not the best one** — it measures
+  current understanding and is allowed to fall. `best_practice_pct` keeps the high
+  water mark separately.
 
 ---
 

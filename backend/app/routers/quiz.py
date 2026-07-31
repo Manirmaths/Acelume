@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.gamification import config, events
 from app.models import Question, QuizAttempt, UserResponse, ReviewQuestion, User, QuestionMastery
 from app.schemas import (
     QuizStartIn, QuizAttemptOut, QuestionPublic, AnswerIn, AnswerOut, ResultsOut, ResultItem,
@@ -15,6 +16,48 @@ from app.subjects import SUBJECTS
 router = APIRouter(prefix="/api/quiz", tags=["quiz"])
 
 RECENT_EXCLUDE_LIMIT = 50
+
+# Modes whose results are allowed to advance topic mastery. A diagnostic
+# deliberately samples every subject shallowly, and "marked" replays questions
+# the student already flagged, so neither is evidence of understanding a topic.
+MASTERY_MODES = {"quiz", "blitz"}
+# Modes that count as the spec's timed "Master" challenge (no hints, on the
+# clock). Only these can take a topic to three stars.
+TIMED_MODES = {"blitz"}
+
+
+def _record_topic_progress(db: Session, user: User, attempt: QuizAttempt) -> None:
+    """
+    On finishing an attempt, fold the result into topic mastery.
+
+    Single-topic attempts only: a mixed-topic quiz is not evidence about any
+    one topic, and crediting it would let a student "master" a topic they
+    barely touched. The topic is taken from the questions themselves rather
+    than attempt.topic, since a subject-wide quiz has no topic set but may
+    still happen to be all one topic.
+    """
+    if attempt.mode not in MASTERY_MODES:
+        return
+    qids = [q for q in attempt.question_ids if isinstance(q, int)]
+    if not qids:
+        return
+
+    rows = db.query(Question.subject, Question.topic).filter(Question.id.in_(qids)).all()
+    pairs = {(s, t) for s, t in rows if s and t}
+    if len(pairs) != 1:
+        return
+
+    subject, topic = pairs.pop()
+    events.record_practice_result(
+        db,
+        user=user,
+        subject=subject,
+        topic=topic,
+        correct=attempt.score,
+        total=len(qids),
+        attempt_id=attempt.id,
+        timed=attempt.mode in TIMED_MODES,
+    )
 
 # Onboarding diagnostic: a short, broad sample across every subject so a
 # brand-new user's Dashboard has real topic_stats *and* a projected score
@@ -207,7 +250,6 @@ def answer_quiz(attempt_id: int, payload: AnswerIn, db: Session = Depends(get_db
         is_correct=is_correct,
     ))
     if is_correct:
-        user.points += 10
         attempt.score += 1
     user.record_practice()
 
@@ -216,16 +258,55 @@ def answer_quiz(attempt_id: int, payload: AnswerIn, db: Session = Depends(get_db
         .filter(QuestionMastery.user_id == user.id, QuestionMastery.question_id == question.id)
         .first()
     )
+    # Read this BEFORE record_answer() updates the counters: a question the
+    # student has seen and got wrong at least once is what makes a later
+    # correct answer a "mistake corrected".
+    previously_missed = bool(
+        mastery and mastery.times_seen > 0 and mastery.times_correct < mastery.times_seen
+    )
     if mastery is None:
         mastery = QuestionMastery(user_id=user.id, question_id=question.id)
         db.add(mastery)
     mastery.record_answer(is_correct)
+
+    # XP now flows through the ledger rather than a bare `user.points += 10`,
+    # so it is auditable and cannot be double-awarded on a retry. The event
+    # key is derived from the attempt and question, which is exactly the
+    # granularity at which a repeat submission must be ignored.
+    if is_correct:
+        events.record(
+            db, user=user, event_type=events.QUESTION_ANSWERED,
+            event_key=f"{events.QUESTION_ANSWERED}:attempt={attempt.id}:q={question.id}",
+            subject=question.subject, topic=question.topic, source_id=str(attempt.id),
+        )
+        if previously_missed:
+            # Awarded once per question for life, not once per attempt --
+            # otherwise a student could farm it by deliberately missing.
+            events.record(
+                db, user=user, event_type=events.MISTAKE_CORRECTED,
+                event_key=f"{events.MISTAKE_CORRECTED}:q={question.id}",
+                subject=question.subject, topic=question.topic, source_id=str(attempt.id),
+            )
 
     attempt.current_index += 1
     if attempt.current_index >= len(attempt.question_ids):
         attempt.finished_at = datetime.utcnow()
         if attempt.mode == "diagnostic":
             user.has_taken_diagnostic = True
+        _record_topic_progress(db, user, attempt)
+
+        # A Smart Review session is the spec's "due review". It only counts as
+        # passed at the practice threshold -- clicking through a review while
+        # getting most of it wrong is not evidence of retention.
+        if attempt.mode == "smart_review" and attempt.question_ids:
+            pct = round(100 * attempt.score / len(attempt.question_ids))
+            if pct >= config.get(db, "practice_pass_pct"):
+                events.record(
+                    db, user=user, event_type=events.REVIEW_COMPLETED,
+                    event_key=f"{events.REVIEW_COMPLETED}:attempt={attempt.id}",
+                    source_id=str(attempt.id),
+                    payload={"pct": pct, "questions": len(attempt.question_ids)},
+                )
 
     db.commit()
     db.refresh(attempt)
