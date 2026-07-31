@@ -37,6 +37,20 @@ jobs:
         working-directory: .
         run: python tools/fix_question_latex.py --check
 
+      # A question that refers to a passage the bank does not hold cannot be
+      # answered by anyone. 192 of these were live and undetected until a key
+      # audit stumbled on them. Fails the build rather than reporting, because
+      # the only way they appear is a content import that forgot its passages.
+      - name: Check for orphaned comprehension questions
+        working-directory: .
+        run: |
+          python tools/quarantine_orphan_questions.py > /tmp/orphans.txt
+          cat /tmp/orphans.txt
+          if grep -qE '\.\.\.and are ACTIVE       : [1-9]' /tmp/orphans.txt; then
+            echo "::error::Active questions depend on passages that are not in the bank."
+            exit 1
+          fi
+
       - name: Run tests
         run: python -m pytest tests/ -v
 

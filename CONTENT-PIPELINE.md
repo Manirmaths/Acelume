@@ -173,6 +173,34 @@ Replacements are written with `source: original` and tagged
 `figure-replacement|generated|solver-verified`. They are **not** past questions,
 and a student is entitled to know the difference.
 
+## Questions nobody can answer
+
+The audit's most valuable finding was not a wrong key. It was questions that
+cannot be answered at all, by the model *or* the student.
+
+**192 comprehension questions with no passage.** All English, all 2025, all
+`active`, all with empty explanations. `data/passages.csv` holds two rows. A
+student sees exactly what the model saw — nothing — guesses, and is told
+nothing afterwards. Quarantined to `draft`; CI now fails if any active question
+depends on a passage the bank does not hold.
+
+**2 questions whose diagram carried the information.** Found by pattern, then
+adjudicated by hand:
+
+- `PHY-0570` — "the stress-strain graph"; points J, K, L exist only on the diagram.
+- `GEO-0846` — "the export table above"; no figures anywhere.
+
+The pattern originally flagged 25. Twenty-three were false alarms: it matched
+"**figure** of speech" in Literature, and most maths and economics questions
+carry their table inline as plain text. That is why the tool wrote a review
+file instead of quarantining — a regex confident enough to delete content
+would have removed 23 perfectly good questions.
+
+**Diagram-backed questions are excluded from audit entirely.** A text-only model
+never sees the image, answers from the words, and "disagrees" with a correct
+key. The first 2025 Mathematics run reported exactly two disagreements and both
+were this. Excluding them took the real 2025 Maths disagreement rate to 0/53.
+
 ## Auditing keys already live
 
 ```powershell

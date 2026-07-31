@@ -4706,7 +4706,7 @@
    "kind": "audit",
    "year": "2019",
    "subject": "Physics",
-   "count": 90,
+   "count": 89,
    "question_ids": [
     "PHY-0551",
     "PHY-0552",
@@ -4727,7 +4727,6 @@
     "PHY-0567",
     "PHY-0568",
     "PHY-0569",
-    "PHY-0570",
     "PHY-0571",
     "PHY-0572",
     "PHY-0573",
@@ -17411,7 +17410,7 @@
    "kind": "audit",
    "year": "undated",
    "subject": "Geography",
-   "count": 67,
+   "count": 66,
    "question_ids": [
     "GEO-0001",
     "GEO-0811",
@@ -17449,7 +17448,6 @@
     "GEO-0843",
     "GEO-0844",
     "GEO-0845",
-    "GEO-0846",
     "GEO-0847",
     "GEO-0848",
     "GEO-0849",
