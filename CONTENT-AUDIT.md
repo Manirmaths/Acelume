@@ -20,6 +20,13 @@ sub- and superscript formatting was flattened into spaces or dropped entirely.
 | Physics + Maths lost super/subscripts | 80 fields / 36 questions | fixed via `tools/fix_physics_maths_scripts.py` |
 | ASCII arrows and comparison operators | 96 fields / 59 questions | fixed via `tools/fix_ascii_symbols.py` |
 | Flattened two-row tables | 13 questions | fixed via `tools/fix_flattened_tables.py` |
+| LaTeX delimiters opened mid-number | 25 fields | fixed via `tools/fix_stray_carets.py` |
+| Escalated content errors | 30 fields / 7 questions | fixed via `tools/fix_flagged_content.py` |
+
+**Every automated defect class now reports zero across all 10,116 questions**: no raw
+HTML outside tables, no ASCII arrows or comparison operators, no bare `frac{}`, no
+doubled delimiters, no `\,` comma hazards. All 4,888 math segments compile through
+KaTeX with `throwOnError: true`.
 
 Guarded by `tools/fix_question_latex.py --check`, which runs in CI.
 
@@ -46,6 +53,23 @@ tags left outside the parsed tables. Swapped in at all 7 `question_text` call si
 with `<p>` wrappers changed to `<div>` since a table inside a paragraph is invalid HTML.
 
 ---
+
+## ⚠️ Eight questions need a human decision
+
+These are the only content items left. Each needs judgement I could not justify making:
+
+| Question | Problem |
+|---|---|
+| `CHM-0421` | **Corrupted duplicate of `CHM-0177`.** Same methane-chlorination question, but spells chlorine with a capital i (`CI 2`, `HCI`) *and* has the wrong product (CH₂Cl instead of CH₃Cl). `CHM-0177` is correct. Recommend retiring this one (`status=draft`) rather than repairing it. |
+| `CHM-0431` | Option B is "concentrated NaCO 4" — not a real compound. Possibly Na₂CO₃. It's a distractor, so nothing hinges on it. |
+| `CHM-0437` | Option D is `CNH 2`, probably CONH₂ with the O dropped. |
+| `MTH-0120` | **Options A and C are the identical string `x 5`**, both missing a comparison operator. Two identical options is a bug on its own. From the answer (D: x > 3 or x < −5) they were probably `x > 5` and `x < 5`. |
+| `MTH-0243` | Options B (`x 1`) and D (`x 5`) missing comparison operators. |
+| `PHY-0249` | Option D is `49.m 3`. Given the others (0.8, 1.4, 3.6) it's probably 4.9, but 49 is possible. |
+| `MTH-0345` | `(1/7 x 3 1/2)` mixes a multiplication sign with the mixed number 3½. |
+| `MTH-0508` | `a x b` names a binary operation "x". **Correct as-is** — listed only so nobody later "fixes" it into multiplication. |
+
+Run `python tools/fix_flagged_content.py` (no `--apply`) to re-print this list any time.
 
 ## ❌ Outstanding, by priority
 
