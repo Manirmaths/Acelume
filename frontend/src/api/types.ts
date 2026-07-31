@@ -128,6 +128,17 @@ export interface Dashboard {
   practice_days: PracticeDay[];
   blitz_best: number;
   unfinished_attempt: UnfinishedAttempt | null;
+  level: Level | null;
+  mastery_streak: number;
+  longest_mastery_streak: number;
+}
+
+export interface Level {
+  level: number;
+  title: string;
+  xp_into_level: number;
+  xp_for_next: number;
+  percent: number;
 }
 
 export interface UnfinishedAttempt {

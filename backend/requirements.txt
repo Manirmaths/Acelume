@@ -16,3 +16,9 @@ pywebpush==2.3.0
 py-vapid==1.9.4
 pytest==8.3.4
 slowapi==0.1.9
+# Python's zoneinfo reads the SYSTEM tz database, which Windows does not have.
+# Without this, ZoneInfo("Africa/Lagos") raises on any Windows dev machine and
+# User.local_today() silently falls back to UTC -- i.e. the timezone-aware
+# streak logic appears to do nothing locally while working fine on Render's
+# Linux hosts. Harmless (unused) on Linux, essential on Windows.
+tzdata==2025.2

@@ -295,6 +295,14 @@ def answer_quiz(attempt_id: int, payload: AnswerIn, db: Session = Depends(get_db
             user.has_taken_diagnostic = True
         _record_topic_progress(db, user, attempt)
 
+        # Mastery streak: a session of real length answered accurately. The
+        # Learning streak (record_practice, above) already counted the day for
+        # simply turning up; this one only counts if the work was good.
+        total_qs = len(attempt.question_ids)
+        if total_qs >= config.get(db, "streak_min_questions"):
+            pct = round(100 * attempt.score / total_qs)
+            user.record_mastery_day(pct >= config.get(db, "mastery_streak_pct"))
+
         # A Smart Review session is the spec's "due review". It only counts as
         # passed at the practice threshold -- clicking through a review while
         # getting most of it wrong is not evidence of retention.

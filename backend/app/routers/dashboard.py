@@ -1,4 +1,4 @@
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -9,7 +9,8 @@ from sqlalchemy import func
 
 from app.models import UserResponse, ReviewQuestion, Question, QuizAttempt, User, QuestionMastery
 from app.progress import compute_progress
-from app.schemas import DashboardOut, DailyGoalIn, UnfinishedAttempt, UserOut, PracticeDay
+from app.gamification import config
+from app.schemas import DashboardOut, DailyGoalIn, LevelOut, UnfinishedAttempt, UserOut, PracticeDay
 
 DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"]
 
@@ -30,7 +31,10 @@ def get_dashboard(db: Session = Depends(get_db), user: User = Depends(get_curren
         y for (y,) in db.query(Question.year).filter(Question.year.isnot(None)).distinct().all()
     ]
 
-    today_start = datetime.combine(datetime.utcnow().date(), time.min)
+    # The student's local midnight, translated to UTC -- not UTC midnight,
+    # which for a Lagos student is 1am their time and would reset the daily
+    # XP ring an hour early.
+    today_start = user.local_day_start_utc()
     correct_today = sum(
         1 for r in responses if r.is_correct and r.timestamp and r.timestamp >= today_start
     )
@@ -49,7 +53,7 @@ def get_dashboard(db: Session = Depends(get_db), user: User = Depends(get_curren
 
     # Weekly streak calendar: fixed Monday-Sunday of the *current* week
     # (not a rolling 7-day window), matching a normal calendar-week view.
-    today = datetime.utcnow().date()
+    today = user.local_today()
     monday = today - timedelta(days=today.weekday())
     practiced_dates = {r.timestamp.date() for r in responses if r.timestamp}
     practice_days = [
@@ -105,6 +109,20 @@ def get_dashboard(db: Session = Depends(get_db), user: User = Depends(get_curren
                 total=total,
             )
 
+    # Level is derived from the lifetime XP total rather than stored, so it can
+    # never drift from the ledger, and retuning the curve in settings takes
+    # effect immediately for everyone.
+    base = config.get(db, "level_base_xp")
+    step = config.get(db, "level_step_xp")
+    lvl, into, needed = config.level_for_xp(user.points or 0, base, step)
+    level_out = LevelOut(
+        level=lvl,
+        title=config.title_for_level(lvl),
+        xp_into_level=into,
+        xp_for_next=needed,
+        percent=round(100 * into / needed) if needed else 0,
+    )
+
     return DashboardOut(
         points=user.points,
         current_streak=user.current_streak,
@@ -123,6 +141,9 @@ def get_dashboard(db: Session = Depends(get_db), user: User = Depends(get_curren
         practice_days=practice_days,
         blitz_best=blitz_best,
         unfinished_attempt=unfinished,
+        level=level_out,
+        mastery_streak=user.mastery_streak or 0,
+        longest_mastery_streak=user.longest_mastery_streak or 0,
     )
 
 

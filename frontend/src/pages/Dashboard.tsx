@@ -128,6 +128,40 @@ export default function Dashboard() {
       <h1 className="font-display font-extrabold text-2xl text-ink-900 mb-1">Welcome back, {user?.username}</h1>
       <p className="text-ink-500 mb-6">Here's how your practice is going.</p>
 
+      {data.level && (
+        <Card padding="md" className="mb-6">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 font-display font-extrabold text-sm flex items-center justify-center flex-shrink-0">
+                {data.level.level}
+              </span>
+              <div className="min-w-0">
+                <p className="font-display font-bold text-sm text-ink-900 truncate">
+                  Level {data.level.level} · {data.level.title}
+                </p>
+                {/* Named explicitly so XP never reads as proof of understanding
+                    -- mastery lives on the Quest Map, not here. */}
+                <p className="text-xs text-ink-400">Based on total practice, not mastery</p>
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-ink-500 flex-shrink-0">
+              {data.level.xp_into_level} / {data.level.xp_for_next} XP
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-ink-100 overflow-hidden">
+            <div
+              className="h-full bg-brand-500 transition-all"
+              style={{ width: `${data.level.percent}%` }}
+              role="progressbar"
+              aria-valuenow={data.level.percent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`${data.level.percent}% towards level ${data.level.level + 1}`}
+            />
+          </div>
+        </Card>
+      )}
+
       <Card padding="lg" className="mb-6 flex flex-wrap items-center gap-5">
         <DailyGoalRing pointsToday={data.points_today} dailyGoal={data.daily_goal} goalMet={data.goal_met} />
         <div className="flex-1 min-w-[180px]">
@@ -215,7 +249,15 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard icon="fa-solid fa-star" label="Total points" value={data.points} tone="bg-brand-50 text-brand-600" />
         <StatCard icon="fa-solid fa-fire" label="Current streak" value={`${data.current_streak}d`} tone="bg-flame-500/10 text-flame-500" />
-        <StatCard icon="fa-solid fa-trophy" label="Longest streak" value={`${data.longest_streak}d`} tone="bg-warning-50 text-warning-600" />
+        {/* Mastery streak sits beside the learning streak on purpose: showing
+            up daily and performing well daily are different achievements, and
+            collapsing them would let attendance read as competence. */}
+        <StatCard
+          icon="fa-solid fa-brain"
+          label="Mastery streak"
+          value={`${data.mastery_streak}d`}
+          tone="bg-success-50 text-success-600"
+        />
         <StatCard icon="fa-solid fa-bolt" label="Best Blitz" value={data.blitz_best} tone="bg-flame-500/10 text-flame-500" />
       </div>
 

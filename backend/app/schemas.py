@@ -237,6 +237,20 @@ class UnfinishedAttempt(BaseModel):
     total: int
 
 
+class LevelOut(BaseModel):
+    """Learning level derived from lifetime XP.
+
+    Deliberately reported alongside, never instead of, mastery: the spec is
+    explicit that XP measures participation and must not read as proof of
+    academic understanding.
+    """
+    level: int
+    title: str
+    xp_into_level: int
+    xp_for_next: int
+    percent: int
+
+
 class DashboardOut(BaseModel):
     points: int
     current_streak: int
@@ -256,6 +270,10 @@ class DashboardOut(BaseModel):
     # Best single Blitz round, mirroring the Blitz leaderboard metric.
     blitz_best: int = 0
     unfinished_attempt: UnfinishedAttempt | None = None
+    level: LevelOut | None = None
+    # Second streak type: requires demonstrated accuracy, not just attendance.
+    mastery_streak: int = 0
+    longest_mastery_streak: int = 0
 
 
 class DailyGoalIn(BaseModel):

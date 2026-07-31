@@ -167,21 +167,49 @@ session overwrites a harder record and the feature actively misleads.
 
 Note the spec's wording requirement — "**+12 percentage points**", not "12%".
 
-## Phase 2 — XP, levels, missions, streaks
+## Phase 2 — levels and streaks ✅ BUILT (missions still to do)
 
-Levels: `config.level_for_xp()` and `title_for_level()` are already written.
+### Levels
 
-Streaks: the spec wants **two** (Learning and Mastery). The existing single streak
-maps to Learning. Mastery streak needs a new pair of columns on `User` — and those
-DO need `_PENDING_COLUMNS` entries in `database.py`, since `User` is already
-deployed with real data.
+Derived from lifetime XP on every dashboard read rather than stored, so the level
+can never drift from the ledger and retuning the curve in settings takes effect
+immediately for everyone. Reported alongside mastery, never instead of it.
 
-Missions need a `DailyMission` table and generation respecting the spec's rules
-(never assign locked topics, avoid three from one subject, 15–30 minutes total).
+### Timezone — and the bug it fixes
 
-**Timezone**: `User` has no timezone column today. Streaks and mission resets both
-need it, and the spec explicitly requires repeated timezone changes not to mint
-extra streak days.
+`User.timezone` (IANA name, default `Africa/Lagos`) plus `User.local_today()`.
+
+`record_practice()` previously used `date.today()`, which is the **server's** date.
+Render runs in UTC, so a Nigerian student practising at 11pm rolled over to the
+next day an hour before their own midnight — losing a streak day they had actually
+earned. Streak boundaries are now calendar days where the student lives.
+
+Defaults to `Africa/Lagos` rather than UTC deliberately: that is where essentially
+the whole user base is, and a UTC default would have silently given every existing
+student the wrong boundary. An unrecognised timezone falls back to UTC rather than
+raising — bad profile data must never make answering a question fail.
+
+**These are the first `_PENDING_COLUMNS` additions to `user` since the gamification
+work started.** `User` is deployed with real data, so `create_all()` alone would not
+have added them.
+
+### Two streaks
+
+- **Learning streak** (the existing one) — any meaningful activity that day.
+- **Mastery streak** — a session of at least `streak_min_questions` answered at
+  `mastery_streak_pct` or better.
+
+A **streak freeze does not apply to the Mastery streak**, on purpose. A freeze
+protects attendance; there is no honest way to protect a day on which no competence
+was demonstrated.
+
+### Still to do in Phase 2: Daily Missions
+
+Needs a `DailyMission` table and generation respecting the spec's rules: never
+assign a locked topic, avoid three missions from one subject, keep the combined
+estimate inside 15–30 minutes. Note that last rule depends on
+`SyllabusTopic.estimated_minutes`, which is currently seeded at a flat 20 for every
+topic — mission planning will only be as good as those estimates.
 
 ## Phase 3 — Achievements
 

@@ -43,6 +43,22 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str]]] = {
         # here (same reasoning as question_id's uniqueness being enforced at
         # the ORM/import-script level in practice).
         ("guardian_link_code", "VARCHAR(16)"),
+        # IANA timezone name, e.g. "Africa/Lagos". Streaks and daily-mission
+        # resets are calendar-day boundaries in the STUDENT's timezone, not
+        # UTC -- without this, a Nigerian student practising at 11pm loses the
+        # day at midnight UTC, an hour before their own midnight.
+        #
+        # Defaults to Africa/Lagos rather than UTC because that is where
+        # essentially the entire user base sits; a UTC default would silently
+        # give every existing student the wrong day boundary.
+        ("timezone", "VARCHAR(64) NOT NULL DEFAULT 'Africa/Lagos'"),
+        # Second streak type (spec section 6): the Learning streak counts any
+        # meaningful activity, the Mastery streak requires demonstrated
+        # accuracy. Tracked separately so a student who shows up daily but is
+        # struggling still keeps a streak worth having.
+        ("mastery_streak", "INTEGER NOT NULL DEFAULT 0"),
+        ("longest_mastery_streak", "INTEGER NOT NULL DEFAULT 0"),
+        ("last_mastery_date", "DATE"),
     ],
     "quiz_attempt": [
         # Plain TEXT, not a native JSON/JSONB column type -- SQLAlchemy's

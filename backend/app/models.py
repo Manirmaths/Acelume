@@ -1,4 +1,7 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, time, timedelta, timezone as _timezone
+from zoneinfo import ZoneInfo
+
+UTC = _timezone.utc
 
 from sqlalchemy import String, Integer, Text, Boolean, DateTime, Date, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -25,6 +28,19 @@ class User(Base):
     # single missed day (see record_practice()). Earned every 7-day streak
     # milestone, capped so it can't be hoarded indefinitely.
     streak_freezes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # IANA timezone name. Streak and daily-mission boundaries are calendar days
+    # in the STUDENT's timezone -- a Nigerian student practising at 11pm would
+    # otherwise lose the day at midnight UTC, an hour before their own.
+    timezone: Mapped[str] = mapped_column(String(64), default="Africa/Lagos", nullable=False)
+
+    # Second streak type (spec section 6). The Learning streak above counts any
+    # meaningful activity; this one requires demonstrated accuracy, so a
+    # student who shows up daily but is struggling keeps the first without the
+    # second falsely implying they are on top of the material.
+    mastery_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    longest_mastery_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_mastery_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     STREAK_FREEZE_CAP = 3
 
     # Duolingo-style daily XP goal. Stored as a points target (points are the
@@ -54,8 +70,61 @@ class User(Base):
     def is_premium(self) -> bool:
         return bool(self.premium_until and self.premium_until > datetime.utcnow())
 
+    def local_today(self) -> date:
+        """
+        Today's date in the STUDENT's timezone.
+
+        Streak days are calendar days where the student lives, not on the
+        server. Render runs in UTC, so `date.today()` rolled a Nigerian
+        student's day over at 11pm their time -- costing them a streak they
+        had actually earned.
+
+        Falls back to UTC if the stored timezone is unrecognised. Bad profile
+        data should never make answering a question fail.
+        """
+        try:
+            return datetime.now(ZoneInfo(self.timezone or "Africa/Lagos")).date()
+        except Exception:
+            return datetime.utcnow().date()
+
+    def local_day_start_utc(self) -> datetime:
+        """
+        The UTC instant at which the student's current calendar day began.
+
+        Timestamps are stored naive-UTC, so "what did they do today?" needs
+        the student's local midnight translated back into UTC -- not UTC
+        midnight, which for a Lagos student is 1am their time. Getting this
+        wrong makes the daily XP ring reset an hour early.
+        """
+        try:
+            tz = ZoneInfo(self.timezone or "Africa/Lagos")
+        except Exception:
+            return datetime.combine(datetime.utcnow().date(), time.min)
+        local_midnight = datetime.combine(self.local_today(), time.min, tzinfo=tz)
+        return local_midnight.astimezone(UTC).replace(tzinfo=None)
+
+    def record_mastery_day(self, met_standard: bool) -> None:
+        """
+        Extend the Mastery streak, which unlike the Learning streak requires
+        the student to have actually performed well that day.
+
+        No streak freeze applies here on purpose: a freeze protects
+        attendance, and there is no honest way to protect a day on which no
+        competence was demonstrated.
+        """
+        if not met_standard:
+            return
+        today = self.local_today()
+        if self.last_mastery_date == today:
+            return
+        gap = (today - self.last_mastery_date).days if self.last_mastery_date else None
+        self.mastery_streak = (self.mastery_streak or 0) + 1 if gap == 1 else 1
+        self.last_mastery_date = today
+        if self.mastery_streak > (self.longest_mastery_streak or 0):
+            self.longest_mastery_streak = self.mastery_streak
+
     def record_practice(self) -> None:
-        today = date.today()
+        today = self.local_today()
         if self.last_practice_date == today:
             return
         gap = (today - self.last_practice_date).days if self.last_practice_date else None
