@@ -80,10 +80,22 @@ export interface ResultItem {
   explanation: string | null;
 }
 
+export interface PersonalBest {
+  is_baseline: boolean;
+  is_best: boolean;
+  current_pct: number;
+  previous_best_pct: number | null;
+  /** Percentage POINTS, not percent. 62 -> 74 is +12 points, not +12%. */
+  delta_points: number | null;
+  attempts: number;
+  message: string;
+}
+
 export interface QuizResults {
   score: number;
   total: number;
   items: ResultItem[];
+  personal_best: PersonalBest | null;
 }
 
 export interface TopicStat {
@@ -192,6 +204,8 @@ export interface Achievement {
   earned: boolean;
   earned_at: string | null;
   newly_unlocked: boolean;
+  progress: number;
+  target: number;
 }
 
 export interface AchievementsResponse {

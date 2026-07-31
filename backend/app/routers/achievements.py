@@ -21,7 +21,7 @@ def list_achievements(db: Session = Depends(get_db), user: User = Depends(get_cu
     for a in ACHIEVEMENTS:
         if a.code in earned_at_by_code:
             continue
-        if a.check(db, user):
+        if a.is_earned(db, user):
             row = UserAchievement(user_id=user.id, code=a.code, earned_at=datetime.utcnow())
             db.add(row)
             newly_unlocked.append(a.code)
@@ -29,16 +29,22 @@ def list_achievements(db: Session = Depends(get_db), user: User = Depends(get_cu
     if newly_unlocked:
         db.commit()
 
-    items = [
-        AchievementOut(
+    items = []
+    for a in ACHIEVEMENTS:
+        current, target = a.progress(db, user)
+        earned = a.code in earned_at_by_code
+        items.append(AchievementOut(
             code=a.code,
             title=a.title,
             description=a.description,
             icon=a.icon,
-            earned=a.code in earned_at_by_code,
+            earned=earned,
             earned_at=earned_at_by_code.get(a.code),
             newly_unlocked=a.code in newly_unlocked,
-        )
-        for a in ACHIEVEMENTS
-    ]
+            # Progress is reported for locked badges so the gallery can show
+            # "17/25" rather than a blank padlock -- knowing how close you are
+            # is the part that motivates.
+            progress=target if earned else current,
+            target=target,
+        ))
     return AchievementsOut(items=items, newly_unlocked=newly_unlocked)

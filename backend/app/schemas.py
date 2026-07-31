@@ -303,6 +303,9 @@ class AchievementOut(BaseModel):
     earned: bool
     earned_at: Optional[datetime] = None
     newly_unlocked: bool = False
+    # How close the student is, so a locked badge can show "17/25".
+    progress: int = 0
+    target: int = 1
 
 
 class AchievementsOut(BaseModel):
@@ -676,3 +679,30 @@ class DailyMissionsOut(BaseModel):
     reward_xp: int
     reward_claimed: bool
     total_minutes: int
+
+
+# ---------- Weekly leagues ----------
+class LeagueEntryOut(BaseModel):
+    rank: int
+    # Self-chosen username only. Never email, school or location.
+    username: str
+    points: int
+    is_you: bool
+    zone: str  # promotion | safe | demotion
+
+
+class LeagueOut(BaseModel):
+    opted_out: bool
+    tier: str
+    tier_label: str
+    week_start: str
+    days_remaining: int
+    your_rank: Optional[int] = None
+    your_points: int = 0
+    entries: list[LeagueEntryOut] = []
+    promote_top: int
+    demote_bottom: int
+
+
+class LeagueOptIn(BaseModel):
+    opted_out: bool

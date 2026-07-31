@@ -129,6 +129,18 @@ def record(
     if award_xp and event_type in XP_RULES:
         _award_xp(db, user=user, event=event, event_type=event_type, now=now)
 
+    # Weekly league points. Imported here rather than at module scope to keep
+    # the dependency one-way: leagues reads config and models, and calling it
+    # from the top of this file would create an import cycle.
+    from app.gamification import leagues
+
+    leagues.award(
+        db, user,
+        event_type=event_type,
+        event_key=event_key,
+        hard=bool((payload or {}).get("difficulty") == "hard"),
+    )
+
     return event
 
 

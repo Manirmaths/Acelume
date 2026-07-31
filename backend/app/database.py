@@ -59,6 +59,11 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str]]] = {
         ("mastery_streak", "INTEGER NOT NULL DEFAULT 0"),
         ("longest_mastery_streak", "INTEGER NOT NULL DEFAULT 0"),
         ("last_mastery_date", "DATE"),
+        # Weekly leagues. Opt-OUT rather than opt-in, so the feature works by
+        # default, but a student who finds public ranking discouraging can
+        # leave without losing any learning feature.
+        ("league_opted_out", "BOOLEAN NOT NULL DEFAULT FALSE"),
+        ("league_tier", "VARCHAR(20) NOT NULL DEFAULT 'foundation'"),
     ],
     "quiz_attempt": [
         # Plain TEXT, not a native JSON/JSONB column type -- SQLAlchemy's

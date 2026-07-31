@@ -81,6 +81,20 @@ DEFAULTS: dict[str, int] = {
 
     # ---- Daily missions (spec section 2) ----
     "missions_per_day": 3,
+
+    # ---- Achievement thresholds (spec section 7) ----
+    # Only the NUMBERS are configurable. The predicates stay in code: storing
+    # executable rules in the database would mean running user-supplied code,
+    # which is a remote-code-execution hazard dressed up as a feature.
+    "ach_streak_short": 3,
+    "ach_streak_week": 7,
+    "ach_streak_month": 30,
+    "ach_answers_century": 100,
+    "ach_all_rounder_subjects": 5,
+    "ach_comeback_corrections": 25,
+    "ach_mastery_streak": 7,
+    "ach_reviews": 20,
+    "ach_mission_days": 20,
 }
 
 

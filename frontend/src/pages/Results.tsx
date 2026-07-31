@@ -152,6 +152,45 @@ export default function Results() {
         </div>
       </div>
 
+      {data.personal_best && (
+        <Card
+          padding="md"
+          className={`mb-6 ${
+            data.personal_best.is_best
+              ? 'bg-success-50 border-success-200'
+              : data.personal_best.is_baseline
+                ? 'bg-info-50 border-info-100'
+                : 'bg-ink-50 border-ink-100'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <i
+              className={`mt-0.5 ${
+                data.personal_best.is_best
+                  ? 'fa-solid fa-arrow-trend-up text-success-600'
+                  : data.personal_best.is_baseline
+                    ? 'fa-solid fa-flag text-info-500'
+                    : 'fa-solid fa-bullseye text-ink-400'
+              }`}
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              {/* The message is composed server-side so the wording -- and
+                  crucially "percentage points", not "percent" -- cannot drift
+                  between the API and the UI. */}
+              <p className="text-sm font-medium text-ink-800">{data.personal_best.message}</p>
+              {data.personal_best.previous_best_pct !== null && (
+                <p className="text-xs text-ink-500 mt-1">
+                  This attempt {data.personal_best.current_pct}% · your best{' '}
+                  {Math.max(data.personal_best.previous_best_pct, data.personal_best.current_pct)}% ·{' '}
+                  {data.personal_best.attempts} comparable attempts
+                </p>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
       <div className="flex flex-wrap justify-center gap-3 mb-8">
         <Button variant="outline" onClick={retakeWrong} icon={<i className="fa-solid fa-rotate-left" />}>
           Retake wrong only

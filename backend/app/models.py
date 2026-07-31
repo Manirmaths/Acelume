@@ -41,6 +41,13 @@ class User(Base):
     mastery_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     longest_mastery_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_mastery_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    # Weekly leagues are opt-OUT, not opt-in: a competitive leaderboard is
+    # exactly the thing that discourages weaker students, and the spec
+    # requires that opting out leaves every learning feature intact.
+    league_opted_out: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Current tier, carried between weeks. Foundation is the entry tier.
+    league_tier: Mapped[str] = mapped_column(String(20), default="foundation", nullable=False)
     STREAK_FREEZE_CAP = 3
 
     # Duolingo-style daily XP goal. Stored as a points target (points are the
@@ -816,3 +823,71 @@ class PersonalBest(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "activity_key", name="uq_personal_best_user_activity"),
     )
+
+
+class LeagueCohort(Base):
+    """
+    One weekly group of ~20 students competing at the same tier.
+
+    Cohorts are per (tier, week_start) and fill up to a cap, so a student is
+    always matched against a small, comparable group rather than the entire
+    user base. `week_start` is the Monday of the competition week.
+    """
+    __tablename__ = "league_cohort"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # foundation | bronze | silver | gold | diamond | scholar
+    tier: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    week_start: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class LeagueMembership(Base):
+    """
+    A student's place in one weekly cohort.
+
+    `points` here are MASTERY POINTS, deliberately not XP: league position must
+    reflect the quality of this week's learning, not lifetime accumulation.
+    Otherwise a long-standing user tops every league forever and the
+    competition is meaningless for everyone else.
+    """
+    __tablename__ = "league_membership"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+    cohort_id: Mapped[int] = mapped_column(ForeignKey("league_cohort.id"), nullable=False, index=True)
+    week_start: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+
+    points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Recorded at close so the result screen can explain what happened.
+    final_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(20), nullable=True)  # promoted|stayed|demoted
+
+    joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        # One cohort per student per week -- the constraint that stops a
+        # repeated request, or a timezone flip, from joining twice.
+        UniqueConstraint("user_id", "week_start", name="uq_league_member_user_week"),
+    )
+
+
+class MasteryPointLedger(Base):
+    """
+    Append-only weekly points, mirroring XpLedger.
+
+    Separate from XP because the two answer different questions and must be
+    able to disagree: XP never falls and accumulates for life, Mastery Points
+    reset every Monday. Sharing one table would make "reset the league" mean
+    "delete someone's XP history".
+    """
+    __tablename__ = "mastery_point_ledger"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+    week_start: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(String(80), nullable=False)
+    ledger_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

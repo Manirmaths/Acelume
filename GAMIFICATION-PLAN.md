@@ -160,12 +160,57 @@ Recommendation order is `review_due` → `practising` → `learning` → `profic
 - The Quest Map UI.
 - Personal Bests (below).
 
-**Personal Bests** needs a `PersonalBest` table keyed on the spec's comparability
-tuple (user, programme, subject, topic, mode, question-count band, difficulty band,
-time-limit config). The comparability rule is the whole point: without it, an easier
-session overwrites a harder record and the feature actively misleads.
+## Phase 1b — Personal Bests ✅ BUILT
 
-Note the spec's wording requirement — "**+12 percentage points**", not "12%".
+`PersonalBest` table, `gamification/personal_best.py`, surfaced on the results screen.
+
+**The comparability key is the feature.** Results are filed under
+`mode:subject:topic:count-band:difficulty`, and only results sharing that key are
+ever compared. Question counts are bucketed (1–9, 10–19, 20–39, 40+) so a 10- and a
+12-question quiz compare fairly but a 10 and a 40 never do.
+
+Without this, an easier or shorter session overwrites a harder record and the app
+congratulates a student for doing less — worse than having no feature, because it
+teaches them the number is meaningless.
+
+Also encoded:
+
+- **The first attempt is a baseline, not an achievement.** Calling it a personal
+  best would empty the label from the outset.
+- **"Percentage points", not "percent".** 62% → 74% is +12 percentage points, not a
+  12% improvement (~19%). The field is named `delta_points` so the UI cannot
+  mislabel it, and the message is composed server-side so wording can't drift.
+- **Attempts under 5 questions are ignored** — a best over 3 questions cheapens the
+  signal everywhere else.
+- **A lower score is phrased as distance, not failure**, and names the weakest topic
+  computed from the actual wrong answers.
+
+## Phase 3 — Achievements ✅ BUILT
+
+Extended `app/achievements.py` from 9 badges to 17, rather than replacing it.
+
+The existing badges were **activity**-based (answer a question, keep a streak). The
+eight new ones are **learning**-based, reading from `TopicMastery`, `PersonalBest`
+and the `LearningEvent` ledger:
+
+| Category | Badge | Measures |
+|---|---|---|
+| Mastery | Subject Scholar | 80% of one subject's topics mastered |
+| Mastery | All-Rounder | proficiency in five subjects |
+| Mastery | Topic Mastered | first mastered topic |
+| Improvement | Comeback Scholar | 25 previously-missed questions corrected |
+| Improvement | Personal Best | beaten your own baseline |
+| Consistency | Consistency Champion | 7-day **mastery** streak |
+| Assessment | Review Expert | 20 due reviews passed |
+| Assessment | Dedicated Learner | all daily missions on 20 days |
+
+Two deliberate choices: Consistency Champion uses the **mastery** streak, not
+attendance, so it cannot be earned by opening the app daily without learning
+anything. And counts come from the **ledger** (`_event_count`), so a replayed or
+re-synced event cannot inflate progress toward a badge.
+
+Still to do: move definitions into a table so admins can add achievements without a
+deploy, and add the achievement gallery's progress bars (`17/25` style).
 
 ## Phase 2 — levels and streaks ✅ BUILT (missions still to do)
 
