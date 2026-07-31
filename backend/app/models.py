@@ -595,3 +595,45 @@ class GamificationSetting(Base):
     value: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SyllabusTopic(Base):
+    """
+    The syllabus graph behind the Quest Map.
+
+    Topics previously existed only as free-text strings on `Question.topic`,
+    which meant there was no ordering, no prerequisites, and therefore no
+    "locked" state and no Test Out. This table gives them identity.
+
+    `prerequisite_id` is a self-reference forming a per-subject chain. It is
+    NULLABLE and seeded sparsely on purpose: a topic with no prerequisite is
+    immediately available, so an unsequenced subject degrades to a flat map
+    rather than an unreachable one. Sequencing 97 topics across 11 subjects is
+    a subject-expert judgement, not a programming one -- see
+    backend/seed_syllabus.py for which subjects are ordered and which are
+    deliberately left flat pending review.
+    """
+    __tablename__ = "syllabus_topic"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    topic: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Display order within the subject. Ties fall back to topic name so the
+    # map never renders in a nondeterministic order.
+    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    prerequisite_id: Mapped[int | None] = mapped_column(
+        ForeignKey("syllabus_topic.id"), nullable=True
+    )
+
+    estimated_minutes: Mapped[int] = mapped_column(Integer, default=20, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Lets an admin retire a topic from the map without deleting student
+    # history that references it.
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("subject", "topic", name="uq_syllabus_subject_topic"),
+    )

@@ -1,0 +1,92 @@
+# Manually-triggered sync of data/questions.csv into the production database.
+#
+# Why this exists: the CSV in this repo is the source of truth for question
+# content, but only sync_questions_db.py actually pushes it to Neon. Running
+# that locally requires outbound port 5432, which many Nigerian ISPs, campus
+# and corporate networks block -- and Render's Shell is a paid feature. A
+# GitHub runner has the network access and already has a secure place to keep
+# the connection string.
+#
+# It also means the production credential never has to be typed on a laptop,
+# pasted into a terminal, or stored in shell history.
+#
+# SETUP (once):
+#   repo -> Settings -> Secrets and variables -> Actions -> New repository secret
+#   Name:  DATABASE_URL
+#   Value: the Neon connection string from Render -> acelume-api -> Environment
+#          (keep the -pooler host and the ?sslmode=require&channel_binding=require tail)
+#
+# USAGE:
+#   Actions tab -> "Sync questions to production" -> Run workflow.
+#   Leave dry_run as "true" the first time to see what WOULD change.
+name: Sync questions to production
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Report changes without writing (recommended first)"
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      seed_syllabus:
+        description: "Also seed the Quest Map syllabus (safe, re-runnable)"
+        required: true
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+
+# Never let two syncs write at once.
+concurrency:
+  group: sync-questions
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      # Content validation before touching production. If the bank has
+      # malformed LaTeX, better to fail here than to publish it to students.
+      - name: Validate question LaTeX
+        run: python tools/fix_question_latex.py --check
+
+      - name: Sync
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL repository secret is not set. See the header of this workflow."
+            exit 1
+          fi
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "::notice::DRY RUN -- no writes."
+            python -u sync_questions_db.py "$DATABASE_URL" --dry-run
+          else
+            python -u sync_questions_db.py "$DATABASE_URL"
+          fi
+
+      # Separate step so a syllabus problem can't roll back a successful
+      # question sync. Skipped on a dry run -- seed_syllabus.py has no
+      # dry-run mode, and it creates tables as a side effect.
+      - name: Seed Quest Map syllabus
+        if: inputs.seed_syllabus == 'true' && inputs.dry_run == 'false'
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -u seed_syllabus.py "$DATABASE_URL"

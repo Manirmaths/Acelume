@@ -95,15 +95,45 @@ Suggested keys: `"QUESTION_ANSWERED:attempt={id}:q={qid}"`,
 
 ---
 
-## Phase 1 — Quest Map and Personal Bests
+## Phase 1a — Quest Map backend ✅ BUILT
 
-**Quest Map** needs one thing that does not exist yet: a **syllabus graph**. Topics
-currently live only as free-text strings on `Question.topic`. Needs a `SyllabusTopic`
-table with `subject`, `topic`, `order`, `prerequisite_topic_id`, `estimated_minutes`,
-plus a seed script derived from the existing topic list.
+`SyllabusTopic` (model), `backend/seed_syllabus.py`, `backend/app/routers/quest.py`,
+`GET /api/quest/{subject}`.
 
-Without prerequisites there is no "locked" state and no Test Out, so this table is
-the real Phase 1 blocker — not the UI.
+97 topics across 11 subjects, with a clean 1:1 against the existing lesson notes.
+
+### The sequencing decision
+
+`prerequisite_id` is seeded **sparsely, on purpose**. Chains exist only for
+Mathematics, Physics, Chemistry and Biology — subjects with an uncontroversial
+teaching order. English, Geography, Economics, Literature, Government, Commerce
+and Accounting are seeded flat, with every topic immediately available.
+
+That is deliberate. Inventing a teaching order for a subject that doesn't obviously
+have one is worse than admitting it, because **a wrong prerequisite actively blocks
+students from content they are ready for**. A topic with no prerequisite is simply
+available, so an unsequenced subject degrades to a flat map rather than an
+unreachable one. Sequence them from the admin UI once a specialist has ordered them.
+
+### Two rules encoded in the endpoint
+
+- **A started topic is never re-locked.** If a prerequisite becomes unmet — say an
+  admin reorders the syllabus — a topic the student has already engaged with stays
+  reachable. Removing access to work already begun would be punitive.
+- **Every locked topic offers Test Out**, so an experienced student is never
+  permanently blocked.
+
+Recommendation order is `review_due` → `practising` → `learning` → `proficient` →
+`available`: overdue retention first, because that is what decays.
+
+### Still to build for Phase 1
+
+- Wire the three learning stages so states actually advance (currently states are
+  read from `TopicMastery`, but nothing writes proficiency/mastery yet — that comes
+  with the `events.record()` call sites).
+- The Test Out diagnostic endpoint.
+- The Quest Map UI.
+- Personal Bests (below).
 
 **Personal Bests** needs a `PersonalBest` table keyed on the spec's comparability
 tuple (user, programme, subject, topic, mode, question-count band, difficulty band,

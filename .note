@@ -31,7 +31,7 @@ add skip questions
 
 cd C:\dev\Acelume\backend
 .\.venv\Scripts\Activate.ps1
-python -u sync_questions_db.py "postgresql://..."
+python -u sync_questions_db.py ""
 
 cd C:\dev\Acelume\backend; .\.venv\Scripts\Activate.ps1
 $url = Read-Host "DATABASE_URL"

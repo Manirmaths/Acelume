@@ -592,3 +592,31 @@ class LeaderboardOut(BaseModel):
     entries: list[LeaderboardEntry]
     your_rank: int
     your_points: int
+
+
+# ---------- Quest Map ----------
+class QuestTopicOut(BaseModel):
+    topic: str
+    description: str | None = None
+    estimated_minutes: int
+    # locked | available | learning | practising | proficient | mastered | review_due
+    state: str
+    stars: int
+    mastery_score: int
+    prerequisite: str | None = None
+    can_test_out: bool = False
+    next_review_at: str | None = None
+
+
+class QuestMapOut(BaseModel):
+    subject: str
+    total_topics: int
+    mastered_topics: int
+    review_due_topics: int
+    percent_complete: int
+    recommended_topic: str | None = None
+    # Echoed so the client shows the same thresholds the server enforces,
+    # even after an admin changes them -- the Android shell may be an old build.
+    practice_pass_pct: int
+    challenge_pass_pct: int
+    topics: list[QuestTopicOut]
