@@ -20,7 +20,7 @@ RECENT_EXCLUDE_LIMIT = 50
 # Modes whose results are allowed to advance topic mastery. A diagnostic
 # deliberately samples every subject shallowly, and "marked" replays questions
 # the student already flagged, so neither is evidence of understanding a topic.
-MASTERY_MODES = {"quiz", "blitz"}
+MASTERY_MODES = {"quiz", "blitz", "test_out"}
 # Modes that count as the spec's timed "Master" challenge (no hints, on the
 # clock). Only these can take a topic to three stars.
 TIMED_MODES = {"blitz"}

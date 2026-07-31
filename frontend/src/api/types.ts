@@ -395,3 +395,28 @@ export interface LearnSubjectProgress {
 export interface LearnHub {
   subjects: LearnSubjectProgress[];
 }
+
+export interface QuestTopic {
+  topic: string;
+  description: string | null;
+  estimated_minutes: number;
+  // locked | available | learning | practising | proficient | mastered | review_due
+  state: string;
+  stars: number;
+  mastery_score: number;
+  prerequisite: string | null;
+  can_test_out: boolean;
+  next_review_at: string | null;
+}
+
+export interface QuestMap {
+  subject: string;
+  total_topics: number;
+  mastered_topics: number;
+  review_due_topics: number;
+  percent_complete: number;
+  recommended_topic: string | null;
+  practice_pass_pct: number;
+  challenge_pass_pct: number;
+  topics: QuestTopic[];
+}

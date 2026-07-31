@@ -21,6 +21,7 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const DeleteAccount = lazy(() => import('./pages/DeleteAccount'));
 const Subjects = lazy(() => import('./pages/Subjects'));
 const SubjectTopics = lazy(() => import('./pages/SubjectTopics'));
+const QuestMap = lazy(() => import('./pages/QuestMap'));
 const TopicHub = lazy(() => import('./pages/TopicHub'));
 const LearnHub = lazy(() => import('./pages/LearnHub'));
 const Quiz = lazy(() => import('./pages/Quiz'));
@@ -72,6 +73,9 @@ export default function App() {
         >
           <Route path="/subjects" element={<Subjects />} />
           <Route path="/subjects/:subject" element={<SubjectTopics />} />
+          {/* Quest Map sits above the flat topic list for a subject. Placed
+              before the :topic route so "quest" can't be read as a topic name. */}
+          <Route path="/subjects/:subject/quest" element={<QuestMap />} />
           <Route path="/subjects/:subject/topics/:topic" element={<TopicHub />} />
           <Route path="/learn" element={<LearnHub />} />
           <Route path="/quiz" element={<Quiz />} />

@@ -7,6 +7,7 @@ decided here -- the spec is explicit that the app must not be able to award
 stars locally.
 """
 
+import random
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,11 +16,91 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.gamification import config, events
-from app.models import SyllabusTopic, TopicMastery, User
-from app.schemas import QuestMapOut, QuestTopicOut
+from app.models import Question, QuizAttempt, SyllabusTopic, TopicMastery, User
+from app.routers.quiz import _attempt_out
+from app.schemas import QuestMapOut, QuestTopicOut, QuizAttemptOut
 from app.subjects import SUBJECTS
 
 router = APIRouter(prefix="/api/quest", tags=["quest"])
+
+# Test Out is a timed challenge on the locked topic's own content. Passing
+# grants proficiency, which both opens that topic and unlocks the next one --
+# the spec's "passing immediately unlocks the topic".
+#
+# It is sized at the practice threshold rather than the (longer) mastery one:
+# the purpose is to prove a student does not need the lesson, not to award
+# three stars without ever doing the work.
+TEST_OUT_QUESTIONS = 12
+
+
+@router.post("/{subject}/{topic}/test-out", response_model=QuizAttemptOut)
+def start_test_out(
+    subject: str,
+    topic: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Start a Test Out challenge so an experienced student is never permanently
+    blocked behind a prerequisite.
+
+    Deliberately allowed on ANY topic, not only locked ones: a student who
+    already knows the material should be able to skip ahead regardless of what
+    the map currently shows, and refusing would be exactly the permanent block
+    the spec warns against. Failing simply changes nothing.
+    """
+    if subject not in SUBJECTS:
+        raise HTTPException(status_code=404, detail="Unknown subject.")
+
+    syllabus = (
+        db.query(SyllabusTopic)
+        .filter(
+            SyllabusTopic.subject == subject,
+            SyllabusTopic.topic == topic,
+            SyllabusTopic.active.is_(True),
+        )
+        .first()
+    )
+    if syllabus is None:
+        raise HTTPException(status_code=404, detail="Unknown topic.")
+
+    row = events.get_or_create_topic(db, user.id, subject, topic)
+    if row.proficient_at is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="You have already reached proficiency in this topic.",
+        )
+
+    pool = (
+        db.query(Question)
+        .filter(
+            Question.status == "active",
+            Question.subject == subject,
+            Question.topic == topic,
+        )
+        .all()
+    )
+    if len(pool) < TEST_OUT_QUESTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail="There aren't enough questions in this topic for a test-out challenge yet.",
+        )
+
+    selected = random.sample(pool, TEST_OUT_QUESTIONS)
+    attempt = QuizAttempt(
+        user_id=user.id,
+        mode="test_out",
+        subject=subject,
+        topic=topic,
+        question_ids=[q.id for q in selected],
+        current_index=0,
+        score=0,
+        time_limit_seconds=TEST_OUT_QUESTIONS * 45,
+    )
+    db.add(attempt)
+    db.commit()
+    db.refresh(attempt)
+    return _attempt_out(db, attempt)
 
 
 @router.get("/{subject}", response_model=QuestMapOut)

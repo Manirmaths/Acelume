@@ -43,6 +43,11 @@ export default function SubjectTopics() {
           <Link to="/subjects">
             <Button variant="outline" size="sm">Back</Button>
           </Link>
+          <Link to={`/subjects/${encodeURIComponent(subject)}/quest`}>
+            <Button variant="outline" size="sm" icon={<i className="fa-solid fa-map" />}>
+              Quest map
+            </Button>
+          </Link>
           <Link to={`/quiz?subject=${encodeURIComponent(subject)}${quizSuffix}`}>
             <Button size="sm">Quick quiz</Button>
           </Link>
