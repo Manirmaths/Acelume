@@ -7,9 +7,13 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.gamification import config, events, missions, personal_best
-from app.models import Question, QuizAttempt, UserResponse, ReviewQuestion, User, QuestionMastery
+from app.models import (
+    Question, QuizAttempt, UserResponse, ReviewQuestion, User, QuestionMastery,
+    PersonalBest,
+)
 from app.schemas import (
     QuizStartIn, QuizAttemptOut, QuestionPublic, AnswerIn, AnswerOut, ResultsOut, ResultItem,
+    PersonalBestOut,
 )
 from app.subjects import SUBJECTS
 

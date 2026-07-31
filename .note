@@ -31,7 +31,7 @@ add skip questions
 
 cd C:\dev\Acelume\backend
 .\.venv\Scripts\Activate.ps1
-python -u sync_questions_db.py "postgresql://neondb_owner:npg_T2yzcDsN0PwB@ep-rapid-bar-aberfahw-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+python -u sync_questions_db.py ""
 
 cd C:\dev\Acelume\backend; .\.venv\Scripts\Activate.ps1
 $url = Read-Host "DATABASE_URL"
