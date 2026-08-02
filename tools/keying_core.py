@@ -12,9 +12,9 @@ the student has no way to detect any of them -- the app is the authority.
 So this module does not try to be right more often. It tries to KNOW WHEN IT IS
 UNSURE, and refuses to publish those:
 
-  Pass A   answer cold, letter only, no reasoning.
-  Pass B   answer again, independently, with the options SHUFFLED and
-           relabelled, and with reasoning required.
+  Pass A   solve directly, with enough room for real working.
+  Pass B   answer independently by elimination, with the options SHUFFLED and
+           relabelled.
   Gate     publish only if both passes name the same option TEXT.
 
 The shuffle is the load-bearing part. Two identical prompts to the same model

@@ -149,7 +149,13 @@ def main():
 
         t0 = time.time()
         log(f"Updating {len(to_update)} existing rows in batches of {BATCH_SIZE}...")
-        if is_postgres:
+        if not to_update:
+            # SQLAlchemy treats an empty executemany parameter list as one
+            # missing parameter set on SQLite, so executing here raises after
+            # successful inserts and rolls the whole transaction back.  A
+            # fresh database legitimately has zero updates.
+            pass
+        elif is_postgres:
             # Bulk UPDATE ... FROM (VALUES ...) -- one round trip per batch
             # instead of one per row, which is what made the naive
             # row-by-row version painfully slow over a remote connection.

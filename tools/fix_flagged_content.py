@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import shutil
 import sys
 from pathlib import Path
 
@@ -70,6 +71,16 @@ FIXES: dict[tuple[str, str], str] = {
     ("CHM-0453", "option_b"): r"\(\mathrm{FeO\cdot H_{2}O}\)",
     ("CHM-0453", "option_c"): r"\(\mathrm{Fe_{2}O_{3}\cdot xH_{2}O}\)",
     ("CHM-0453", "option_d"): r"\(\mathrm{Fe_{3}O_{4}\cdot 2H_{2}O}\)",
+
+    # The bank/UI has four option columns. These five legacy rows were imported
+    # with a fifth option flattened into option D and correct_option="E", so an
+    # active student could never select the stored answer. Keep the content for
+    # repair, but do not serve an impossible question.
+    ("GOV-0203", "status"): "draft",
+    ("MTH-0275", "status"): "draft",
+    ("PHY-0138", "status"): "draft",
+    ("PHY-0174", "status"): "draft",
+    ("PHY-0196", "status"): "draft",
 }
 
 STILL_OPEN = {
@@ -126,11 +137,16 @@ def main() -> int:
         print(f"  [{qid}] {why}")
 
     if args.apply:
-        with CSV_PATH.open("w", encoding="utf-8-sig", newline="") as fh:
+        temp = CSV_PATH.with_suffix(".csv.flagged-content.tmp")
+        backup = CSV_PATH.with_suffix(".csv.flagged-content.bak")
+        with temp.open("w", encoding="utf-8-sig", newline="") as fh:
             writer = csv.DictWriter(fh, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
-        print("\nwritten to data/questions.csv")
+        shutil.copy2(CSV_PATH, backup)
+        temp.replace(CSV_PATH)
+        print(f"\nbackup -> {backup}")
+        print("written to data/questions.csv")
     else:
         print("\n(dry run -- pass --apply to write)")
     return 0

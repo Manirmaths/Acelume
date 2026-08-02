@@ -55,13 +55,32 @@ def main() -> int:
     have_text = {norm(r["question_text"]) for r in bank}
 
     with open(args.infile, encoding="utf-8-sig") as fh:
-        incoming = [dict(r) for r in csv.DictReader(fh)]
+        reader = csv.DictReader(fh)
+        incoming_fields = list(reader.fieldnames or [])
+        incoming = [dict(r) for r in reader]
+
+    # A reduced hand-keying schema once looked valid here but silently erased
+    # provenance, difficulty, tags, and other omitted metadata on 1,639 rows.
+    # Keyed outputs must be complete bank rows; review-only CSVs never belong in
+    # this merge path.
+    clean_fields = {field.lstrip("ï»¿") for field in incoming_fields}
+    required = {field.lstrip("ï»¿") for field in fields}
+    missing = sorted(required - clean_fields)
+    if missing:
+        raise SystemExit(
+            "refusing reduced-schema input; missing bank columns: "
+            + ", ".join(missing)
+        )
 
     add, skipped = [], Counter()
     for r in incoming:
         qid = r.get("question_id") or r.get(idcol, "")
         if r.get("correct_option") not in ("A", "B", "C", "D"):
             skipped["no answer key"] += 1
+            continue
+        answer_field = f"option_{r['correct_option'].lower()}"
+        if not (r.get(answer_field) or "").strip():
+            skipped["answer names an empty option"] += 1
             continue
         if not (r.get("explanation") or "").strip():
             skipped["no explanation"] += 1
@@ -104,11 +123,15 @@ def main() -> int:
         return 0
 
     backup = bank_path.with_suffix(".csv.bak")
+    temp = bank_path.with_suffix(".csv.tmp")
     shutil.copy2(bank_path, backup)
-    with open(bank_path, "w", encoding="utf-8-sig", newline="") as fh:
+    with open(temp, "w", encoding="utf-8-sig", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
         w.writerows(bank + add)
+    # Replace only after a complete temp file exists. If the process is killed
+    # during writing, the live bank is untouched rather than truncated.
+    temp.replace(bank_path)
     print(f"backup  -> {backup}")
     print(f"wrote   -> {bank_path}  ({len(bank) + len(add)} rows)")
     print("\nNext: run the sync-questions GitHub Action (dry_run: false) to push")

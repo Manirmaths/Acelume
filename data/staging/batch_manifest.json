@@ -11488,8 +11488,12 @@
     "ENG-J00963",
     "ENG-J00964"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 59,
+    "review": 8,
+    "needs_passage": 24
+   }
   },
   {
    "id": "key-2001-Biology",
@@ -11538,8 +11542,12 @@
     "BIO-J00423",
     "BIO-J00424"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 36,
+    "review": 3,
+    "needs_passage": 0
+   }
   },
   {
    "id": "key-2001-Geography",
@@ -11578,8 +11586,12 @@
     "GEO-J00403",
     "GEO-J00404"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 26,
+    "review": 3,
+    "needs_passage": 0
+   }
   },
   {
    "id": "key-2001-Economics",
@@ -11634,8 +11646,11 @@
     "ECO-J00453",
     "ECO-J00454"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 43,
+    "review": 2
+   }
   },
   {
    "id": "key-2001-Literature",
@@ -11693,8 +11708,12 @@
     "LIT-J00524",
     "LIT-J00525"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 42,
+    "review": 6,
+    "orphan": 0
+   }
   },
   {
    "id": "key-2001-Government",
@@ -11742,8 +11761,12 @@
     "GOV-J00480",
     "GOV-J00481"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 35,
+    "review": 3,
+    "orphan": 0
+   }
   },
   {
    "id": "key-2001-Commerce",
@@ -11795,8 +11818,12 @@
     "COM-J00297",
     "COM-J00298"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 31,
+    "review": 7,
+    "orphan": 4
+   }
   },
   {
    "id": "key-2001-Accounting",
@@ -11849,8 +11876,12 @@
     "ACC-J00294",
     "ACC-J00295"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 39,
+    "review": 1,
+    "orphan": 3
+   }
   },
   {
    "id": "key-2000-Biology",
@@ -11898,8 +11929,11 @@
     "BIO-J00384",
     "BIO-J00385"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 37,
+    "review": 1
+   }
   },
   {
    "id": "key-2000-Geography",
@@ -11948,8 +11982,11 @@
     "GEO-J00374",
     "GEO-J00375"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 36,
+    "review": 3
+   }
   },
   {
    "id": "key-2000-Economics",
@@ -11996,8 +12033,11 @@
     "ECO-J00408",
     "ECO-J00409"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 35,
+    "review": 2
+   }
   },
   {
    "id": "key-2000-Literature",
@@ -12054,8 +12094,12 @@
     "LIT-J00476",
     "LIT-J00477"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 37,
+    "review": 8,
+    "orphan": 2
+   }
   },
   {
    "id": "key-2000-Government",
@@ -12100,8 +12144,11 @@
     "GOV-J00442",
     "GOV-J00443"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 32,
+    "review": 3
+   }
   },
   {
    "id": "key-2000-Commerce",
@@ -12147,8 +12194,12 @@
     "COM-J00255",
     "COM-J00256"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 25,
+    "review": 10,
+    "orphan": 1
+   }
   },
   {
    "id": "key-2000-Accounting",
@@ -12206,8 +12257,12 @@
     "ACC-J00251",
     "ACC-J00252"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 43,
+    "review": 1,
+    "orphan": 4
+   }
   },
   {
    "id": "key-1999-Biology",
@@ -12256,8 +12311,12 @@
     "BIO-J00346",
     "BIO-J00347"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 35,
+    "review": 2,
+    "orphan": 2
+   }
   },
   {
    "id": "key-1999-Geography",
@@ -12297,8 +12356,12 @@
     "GEO-J00335",
     "GEO-J00336"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 26,
+    "review": 4,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1999-Economics",
@@ -12349,8 +12412,11 @@
     "ECO-J00371",
     "ECO-J00372"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 33,
+    "review": 8
+   }
   },
   {
    "id": "key-1999-Literature",
@@ -12404,8 +12470,11 @@
     "LIT-J00429",
     "LIT-J00430"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 42,
+    "review": 2
+   }
   },
   {
    "id": "key-1999-Government",
@@ -12462,8 +12531,12 @@
     "GOV-J00407",
     "GOV-J00408"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 45,
+    "review": 1,
+    "orphan": 1
+   }
   },
   {
    "id": "key-1999-Commerce",
@@ -12519,8 +12592,12 @@
     "COM-J00219",
     "COM-J00220"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 43,
+    "review": 2,
+    "orphan": 1
+   }
   },
   {
    "id": "key-1999-Accounting",
@@ -12574,8 +12651,12 @@
     "ACC-J00203",
     "ACC-J00204"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 40,
+    "review": 3,
+    "orphan": 1
+   }
   },
   {
    "id": "key-1998-Biology",
@@ -12626,8 +12707,12 @@
     "BIO-J00307",
     "BIO-J00308"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 41,
+    "review": 0,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1998-Geography",
@@ -12679,8 +12764,12 @@
     "GEO-J00305",
     "GEO-J00306"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 40,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1998-Economics",
@@ -12728,8 +12817,12 @@
     "ECO-J00330",
     "ECO-J00331"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 36,
+    "review": 1,
+    "orphan": 1
+   }
   },
   {
    "id": "key-1998-Literature",
@@ -12780,8 +12873,12 @@
     "LIT-J00385",
     "LIT-J00386"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 29,
+    "review": 12,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1998-Government",
@@ -12835,8 +12932,12 @@
     "GOV-J00360",
     "GOV-J00361"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 43,
+    "review": 0,
+    "orphan": 1
+   }
   },
   {
    "id": "key-1998-Commerce",
@@ -12889,8 +12990,12 @@
     "COM-J00173",
     "COM-J00174"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 39,
+    "review": 3,
+    "orphan": 1
+   }
   },
   {
    "id": "key-1998-Accounting",
@@ -12948,8 +13053,12 @@
     "ACC-J00159",
     "ACC-J00160"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 47,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1997-Biology",
@@ -12995,8 +13104,12 @@
     "BIO-J00266",
     "BIO-J00267"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 36,
+    "review": 0,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1997-Geography",
@@ -13043,8 +13156,12 @@
     "GEO-J00263",
     "GEO-J00264"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 36,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1997-Economics",
@@ -13095,8 +13212,12 @@
     "ECO-J00292",
     "ECO-J00293"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 38,
+    "review": 3,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1997-Literature",
@@ -13156,8 +13277,12 @@
     "LIT-J00344",
     "LIT-J00345"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 37,
+    "review": 13,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1997-Government",
@@ -13206,8 +13331,12 @@
     "GOV-J00316",
     "GOV-J00317"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 39,
+    "review": 0,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1997-Commerce",
@@ -13263,8 +13392,12 @@
     "COM-J00130",
     "COM-J00131"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 45,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1997-Accounting",
@@ -13316,8 +13449,12 @@
     "ACC-J00111",
     "ACC-J00112"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 40,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1995-Biology",
@@ -13368,8 +13505,12 @@
     "BIO-J00230",
     "BIO-J00231"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 40,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1995-Geography",
@@ -13415,8 +13556,12 @@
     "GEO-J00226",
     "GEO-J00227"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 36,
+    "review": 0,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1995-Economics",
@@ -13468,8 +13613,12 @@
     "ECO-J00251",
     "ECO-J00252"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 41,
+    "review": 0,
+    "orphan": 1
+   }
   },
   {
    "id": "key-1995-Literature",
@@ -13529,8 +13678,12 @@
     "LIT-J00294",
     "LIT-J00295"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 32,
+    "review": 18,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1995-Government",
@@ -13586,8 +13739,12 @@
     "GOV-J00277",
     "GOV-J00278"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 44,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1995-Commerce",
@@ -13641,8 +13798,12 @@
     "COM-J00084",
     "COM-J00085"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 37,
+    "review": 7,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1995-Accounting",
@@ -13692,8 +13853,12 @@
     "ACC-J00069",
     "ACC-J00070"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 37,
+    "review": 2,
+    "orphan": 1
+   }
   },
   {
    "id": "key-1994-Biology",
@@ -13741,8 +13906,12 @@
     "BIO-J00189",
     "BIO-J00190"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 36,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1994-Geography",
@@ -13790,8 +13959,12 @@
     "GEO-J00190",
     "GEO-J00191"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 38,
+    "review": 0,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1994-Economics",
@@ -13843,8 +14016,12 @@
     "ECO-J00209",
     "ECO-J00210"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 39,
+    "review": 1,
+    "orphan": 2
+   }
   },
   {
    "id": "key-1994-Literature",
@@ -13902,8 +14079,12 @@
     "LIT-J00244",
     "LIT-J00245"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 39,
+    "review": 8,
+    "orphan": 1
+   }
   },
   {
    "id": "key-1994-Government",
@@ -13963,8 +14144,12 @@
     "GOV-J00231",
     "GOV-J00232"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 47,
+    "review": 3,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1994-Commerce",
@@ -14015,8 +14200,12 @@
     "COM-J00040",
     "COM-J00041"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 39,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1994-Accounting",
@@ -14056,8 +14245,12 @@
     "ACC-J00029",
     "ACC-J00030"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 30,
+    "review": 0,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1993-Biology",
@@ -14102,8 +14295,12 @@
     "BIO-J00151",
     "BIO-J00152"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 35,
+    "review": 0,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1993-Geography",
@@ -14148,8 +14345,12 @@
     "GEO-J00152",
     "GEO-J00153"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 34,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1993-Economics",
@@ -14199,8 +14400,12 @@
     "ECO-J00167",
     "ECO-J00168"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 38,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1993-Literature",
@@ -14260,8 +14465,12 @@
     "LIT-J00196",
     "LIT-J00197"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 43,
+    "review": 4,
+    "orphan": 3
+   }
   },
   {
    "id": "key-1993-Government",
@@ -14314,8 +14523,12 @@
     "GOV-J00181",
     "GOV-J00182"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 42,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1992-Biology",
@@ -14364,8 +14577,12 @@
     "BIO-J00116",
     "BIO-J00117"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 37,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1992-Geography",
@@ -14417,8 +14634,12 @@
     "GEO-J00117",
     "GEO-J00118"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 40,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1992-Economics",
@@ -14472,8 +14693,12 @@
     "ECO-J00127",
     "ECO-J00128"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 42,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1992-Literature",
@@ -14531,8 +14756,12 @@
     "LIT-J00146",
     "LIT-J00147"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 47,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1992-Government",
@@ -14583,8 +14812,12 @@
     "GOV-J00138",
     "GOV-J00139"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 40,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1991-Biology",
@@ -14633,8 +14866,12 @@
     "BIO-J00077",
     "BIO-J00078"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 39,
+    "review": 0,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1991-Geography",
@@ -14684,8 +14921,12 @@
     "GEO-J00075",
     "GEO-J00076"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 39,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1991-Economics",
@@ -14736,8 +14977,12 @@
     "ECO-J00083",
     "ECO-J00084"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 38,
+    "review": 3,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1991-Literature",
@@ -14797,8 +15042,12 @@
     "LIT-J00098",
     "LIT-J00099"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 49,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1991-Government",
@@ -14847,8 +15096,12 @@
     "GOV-J00097",
     "GOV-J00098"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 39,
+    "review": 0,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1990-English",
@@ -14964,8 +15217,12 @@
     "ENG-J00105",
     "ENG-J00106"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 81,
+    "review": 25,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1990-Biology",
@@ -15014,8 +15271,12 @@
     "BIO-J00038",
     "BIO-J00039"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 36,
+    "review": 3,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1990-Geography",
@@ -15061,8 +15322,12 @@
     "GEO-J00035",
     "GEO-J00036"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 35,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1990-Economics",
@@ -15115,8 +15380,12 @@
     "ECO-J00042",
     "ECO-J00043"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 42,
+    "review": 1,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1990-Literature",
@@ -15175,8 +15444,12 @@
     "LIT-J00048",
     "LIT-J00049"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 47,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "key-1990-Government",
@@ -15245,8 +15518,12 @@
     "GOV-J00058",
     "GOV-J00059"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 57,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "audit-undated-Mathematics",
@@ -15600,8 +15877,12 @@
     "ENG-J00355",
     "ENG-J00356"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 200,
+    "review": 50,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-English-2",
@@ -15861,8 +16142,12 @@
     "ENG-J00605",
     "ENG-J00606"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 193,
+    "review": 57,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-English-3",
@@ -16122,8 +16407,12 @@
     "ENG-J00855",
     "ENG-J00856"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 195,
+    "review": 55,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-English-4",
@@ -16383,8 +16672,12 @@
     "ENG-J01197",
     "ENG-J01198"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 171,
+    "review": 79,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-English-5",
@@ -16644,8 +16937,12 @@
     "ENG-J01447",
     "ENG-J01448"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 191,
+    "review": 59,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-English-6",
@@ -16898,8 +17195,12 @@
     "ENG-J01690",
     "ENG-J01691"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 164,
+    "review": 79,
+    "orphan": 0
+   }
   },
   {
    "id": "audit-undated-Physics",
@@ -17357,8 +17658,12 @@
     "BIO-J00673",
     "BIO-J00674"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 248,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-Biology-2",
@@ -17402,8 +17707,12 @@
     "BIO-J00707",
     "BIO-J00708"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 34,
+    "review": 0,
+    "orphan": 0
+   }
   },
   {
    "id": "audit-undated-Geography",
@@ -17740,8 +18049,12 @@
     "GEO-J00653",
     "GEO-J00654"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 242,
+    "review": 8,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-Geography-2",
@@ -17770,8 +18083,12 @@
     "GEO-J00672",
     "GEO-J00673"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 17,
+    "review": 2,
+    "orphan": 0
+   }
   },
   {
    "id": "audit-undated-Economics",
@@ -18113,8 +18430,12 @@
     "ECO-J00703",
     "ECO-J00704"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 241,
+    "review": 9,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-Economics-2",
@@ -18223,8 +18544,12 @@
     "ECO-J00802",
     "ECO-J00803"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 77,
+    "review": 22,
+    "orphan": 0
+   }
   },
   {
    "id": "audit-undated-Literature",
@@ -18497,8 +18822,12 @@
     "LIT-J00774",
     "LIT-J00775"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 154,
+    "review": 96,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-Literature-2",
@@ -18653,8 +18982,12 @@
     "LIT-J00919",
     "LIT-J00920"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 92,
+    "review": 53,
+    "orphan": 0
+   }
   },
   {
    "id": "audit-undated-Government",
@@ -18927,8 +19260,12 @@
     "GOV-J00730",
     "GOV-J00731"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 219,
+    "review": 31,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-Government-2",
@@ -19064,8 +19401,12 @@
     "GOV-J00856",
     "GOV-J00857"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 105,
+    "review": 21,
+    "orphan": 0
+   }
   },
   {
    "id": "audit-undated-Commerce",
@@ -19345,8 +19686,12 @@
     "COM-J00547",
     "COM-J00548"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 178,
+    "review": 72,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-Commerce-2",
@@ -19459,8 +19804,12 @@
     "COM-J00650",
     "COM-J00651"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 82,
+    "review": 21,
+    "orphan": 0
+   }
   },
   {
    "id": "audit-undated-Accounting",
@@ -19751,8 +20100,12 @@
     "ACC-J00544",
     "ACC-J00545"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 170,
+    "review": 80,
+    "orphan": 0
+   }
   },
   {
    "id": "key-undated-Accounting-2",
@@ -19848,8 +20201,12 @@
     "ACC-J00630",
     "ACC-J00631"
    ],
-   "status": "pending",
-   "result": null
+   "status": "done",
+   "result": {
+    "keyed": 56,
+    "review": 30,
+    "orphan": 0
+   }
   }
  ]
 }

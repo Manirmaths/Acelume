@@ -127,7 +127,9 @@ def read_manifest() -> list[dict]:
 
 
 def save_manifest(batches: list[dict]) -> None:
-    MANIFEST.write_text(json.dumps({"batches": batches}, indent=1), encoding="utf-8")
+    temp = MANIFEST.with_suffix(".json.tmp")
+    temp.write_text(json.dumps({"batches": batches}, indent=1), encoding="utf-8")
+    temp.replace(MANIFEST)
 
 
 def status() -> int:
@@ -173,7 +175,10 @@ def run_batch(batch: dict, *, model: str, workers: int, apply: bool) -> int:
 
     if batch["kind"] == "key":
         cmd = [sys.executable, str(REPO / "tools" / "answer_keys.py"),
-               "--in", str(path), "--model", model, "--workers", str(workers)]
+               "--in", str(path),
+               "--out", str(BATCH_DIR / f"{batch['id']}_keyed.csv"),
+               "--review-out", str(BATCH_DIR / f"{batch['id']}_needs_review.csv"),
+               "--model", model, "--workers", str(workers)]
     else:
         cmd = [sys.executable, str(REPO / "tools" / "audit_keys.py"),
                "--in", str(path), "--model", model, "--workers", str(workers),
@@ -184,6 +189,47 @@ def run_batch(batch: dict, *, model: str, workers: int, apply: bool) -> int:
     return subprocess.call(cmd)
 
 
+def run_all(batches, *, kind, model, workers, apply, stop_after, run) -> int:
+    """Work through every pending batch in queue order.
+
+    Resumable by construction: a batch is marked done only after its tool exits
+    cleanly with --apply, and each tool keeps its own per-question checkpoint.
+    Interrupt this at any point -- rerunning picks up exactly where it stopped,
+    re-answering nothing.
+
+    It stops at the first failing batch rather than ploughing on. A batch fails
+    for a reason, usually a bad API key or a rate limit, and continuing would
+    burn through the remaining batches recording the same failure each time.
+    """
+    pending = [b for b in batches if b["status"] == "pending"
+               and (not kind or b["kind"] == kind)]
+    if stop_after:
+        pending = pending[:stop_after]
+    total_q = sum(b["count"] for b in pending)
+    print(f"{len(pending)} pending batches, {total_q:,} questions")
+    if not run:
+        for b in pending[:20]:
+            print(f"    {b['id']:34s} {b['count']:5d}")
+        if len(pending) > 20:
+            print(f"    ... and {len(pending) - 20} more")
+        print("\nAdd --run --apply to work through them.")
+        return 0
+
+    for n, batch in enumerate(pending, start=1):
+        print(f"\n########## {n}/{len(pending)}  {batch['id']} ##########")
+        rc = run_batch(batch, model=model, workers=workers, apply=apply)
+        if rc != 0:
+            print(f"\n{batch['id']} failed (exit {rc}). Stopping so the failure "
+                  f"is not repeated across every remaining batch.")
+            print("Fix the cause and rerun this same command; finished batches are skipped.")
+            return rc
+        if apply:
+            batch["status"] = "done"
+            save_manifest(batches)
+    print(f"\nfinished {len(pending)} batches")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--build", action="store_true")
@@ -191,18 +237,59 @@ def main() -> int:
     ap.add_argument("--next", action="store_true")
     ap.add_argument("--batch", default="")
     ap.add_argument("--run", action="store_true")
+    ap.add_argument("--stage", action="store_true",
+                    help="write the selected batch CSV without calling a model")
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--model", default="gpt-4o")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--mark-done", default="", help="mark a batch id complete")
+    ap.add_argument(
+        "--record-result", action="append", default=[], metavar="ID:KEYED:REVIEW:ORPHAN",
+        help="atomically mark one or more batches done with reconciled counts",
+    )
+    ap.add_argument("--all", action="store_true",
+                    help="work through every pending batch, not just the next one")
+    ap.add_argument("--kind", default="", choices=["", "key", "audit"],
+                    help="restrict --all to keying or auditing")
+    ap.add_argument("--stop-after", type=int, default=0,
+                    help="with --all, stop after this many batches")
     args = ap.parse_args()
 
     if args.build:
         return build()
-    if args.status or not (args.next or args.batch or args.mark_done):
+    if args.status or not (
+        args.next or args.batch or args.mark_done or args.record_result or args.all
+    ):
         return status()
 
     batches = read_manifest()
+    if args.record_result:
+        by_id = {batch["id"]: batch for batch in batches}
+        for spec in args.record_result:
+            try:
+                batch_id, keyed, review, orphan = spec.rsplit(":", 3)
+                result = {
+                    "keyed": int(keyed), "review": int(review), "orphan": int(orphan),
+                }
+            except ValueError as exc:
+                raise SystemExit(
+                    f"invalid --record-result {spec!r}; expected ID:KEYED:REVIEW:ORPHAN"
+                ) from exc
+            batch = by_id.get(batch_id)
+            if batch is None:
+                raise SystemExit(f"no such batch: {batch_id}")
+            if any(value < 0 for value in result.values()):
+                raise SystemExit(f"{batch_id}: result counts cannot be negative")
+            if sum(result.values()) != batch["count"]:
+                raise SystemExit(
+                    f"{batch_id}: result counts sum to {sum(result.values())}, "
+                    f"manifest count is {batch['count']}"
+                )
+            batch["status"] = "done"
+            batch["result"] = result
+            print(f"recorded {batch_id}: {result}")
+        save_manifest(batches)
+        return 0
     if args.mark_done:
         for b in batches:
             if b["id"] == args.mark_done:
@@ -211,6 +298,11 @@ def main() -> int:
                 print(f"marked {b['id']} done")
                 return 0
         raise SystemExit(f"no such batch: {args.mark_done}")
+
+    if args.all:
+        return run_all(batches, kind=args.kind, model=args.model,
+                       workers=args.workers, apply=args.apply,
+                       stop_after=args.stop_after, run=args.run)
 
     if args.batch:
         batch = next((b for b in batches if b["id"] == args.batch), None)
@@ -226,8 +318,12 @@ def main() -> int:
     print(f"kind       : {batch['kind']}  ({'needs keys' if batch['kind']=='key' else 'has keys, auditing'})")
     print(f"subject    : {batch['subject']}   year: {batch['year']}")
     print(f"questions  : {batch['count']}")
+    if args.stage:
+        path = write_batch_csv(batch)
+        print(f"\nstaged -> {path}")
+        return 0
     if not args.run:
-        print("\nAdd --run to execute it.")
+        print("\nAdd --stage to write its CSV, or --run to execute it.")
         return 0
 
     rc = run_batch(batch, model=args.model, workers=args.workers, apply=args.apply)

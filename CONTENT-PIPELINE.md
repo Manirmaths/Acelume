@@ -69,12 +69,58 @@ against a flawed answer sheet.
 The dominant failure mode is not "model got it wrong" but "question has two
 defensible answers". That is a content defect worth fixing on its own.
 
+## The supplied solved archive is evidence, not authority
+
+The later `jamb_solved_questions_1990_to_2009.zip` includes source keys and
+templated explanations, but exact matching against all 144 validation questions
+scored only **121/144 (84.0%)**. It must never be copied directly into the bank.
+
+`tools/import_solved_jamb_archive.py` can use it as one leg of an agreement
+gate. On a blind validation of the exact workflow used for the August 2026
+continuation:
+
+| gate | coverage | accuracy of accepted keys |
+|---|---:|---:|
+| direct agent + archive | 122/144 | 118/122 (96.7%) |
+| direct agent + independent elimination + archive | 119/144 | 117/119 (98.3%) |
+
+The two recorded three-way misses are both already documented as likely defects
+in the old bank key, so 98.3% is conservative. This measurement belongs to that
+exact set of passes; a different model or weakened prompt must be validated
+again. The solved archive still never makes a question `active`.
+
+For the August 2026 archive completion, all 91 key batches are now finished.
+The final 15 batches processed 3,052 questions: 2,247 passed the three-way gate
+and 805 stayed in review. The earlier 234-row review pile was separately
+adjudicated to 173 approved and 61 held. Duplicate-text guards removed 13 of
+the final accepted rows, leaving 3,553 gated or adjudicated archive questions
+approved in the bank.
+
+Three explicit post-keying steps close gaps that the answer gate does not:
+
+```powershell
+# The archive has no topics; uncertain classifications stay broad instead of
+# being forced into a misleading lesson topic.
+python tools/classify_jamb_archive_topics.py
+python tools/classify_jamb_archive_topics.py --apply
+
+# Promote only consensus-keyed or adjudicated-keyed drafts after the Admin
+# spot-check. This rechecks answers, options, explanations, topics and passages.
+python tools/promote_approved_archive_questions.py
+python tools/promote_approved_archive_questions.py --apply
+```
+
+`adjudicate_question_reviews.py` applies an explicit approve/hold decision CSV
+to full-schema review rows. It refuses to approve a row whose earlier review
+established that its source passage is missing. Approved rows remain drafts
+until the separate promotion command above.
+
 ## The gate
 
 `tools/keying_core.py` answers every question twice:
 
-- **Pass A** — cold, letter only, no reasoning. It cannot talk itself into a position.
-- **Pass B** — independent, reasoning required, and the **options shuffled and relabelled**.
+- **Pass A** — solve directly, with up to two lines of real working.
+- **Pass B** — independently eliminate wrong options, with the **options shuffled and relabelled**.
 - **Publish only if both passes name the same option _text_.**
 
 The shuffle is the load-bearing part. Asking the same model the same question
@@ -120,15 +166,16 @@ them as the new one's.
 
 ## Working through it, one subject-year at a time
 
-17,045 questions in one run is a bad idea for reasons unrelated to cost: you
+16,826 questions in one run is a bad idea for reasons unrelated to cost: you
 cannot inspect the result, a weak model poisons everything before you notice,
 and there is no natural place to stop and look. `tools/batch_queue.py` splits
-the work into **276 batches** of median ~45 questions, newest year first.
+the work into **275 batches** of median ~45 questions, newest year first.
 
 ```powershell
-python tools/batch_queue.py --build      # 276 batches, 17,045 questions
+python tools/batch_queue.py --build      # 275 batches, 16,826 questions
 python tools/batch_queue.py --status     # progress
 python tools/batch_queue.py --next       # what is up next
+python tools/batch_queue.py --batch key-1990-English --stage
 python tools/batch_queue.py --next --run --apply
 python tools/batch_queue.py --batch key-2001-Biology --run
 ```
@@ -137,7 +184,7 @@ Two kinds of batch, because the bank has two different problems:
 
 | kind | what it is | tool |
 |---|---|---|
-| `audit` | 10,111 live questions whose keys were never checked | `audit_keys.py` |
+| `audit` | 9,892 active, non-image questions whose keys were never checked | `audit_keys.py` |
 | `key` | 6,934 archive questions with no key at all | `answer_keys.py` |
 
 The queue starts at `audit-2025-Mathematics`, then works through 2025's other
@@ -146,6 +193,22 @@ then the archive, 2001 back to 1990. Undated batches come last.
 
 Each batch writes its own CSV and its own checkpoint. A batch is only marked
 done when it completes with `--apply`.
+
+### Working through everything at once
+
+```powershell
+python tools/batch_queue.py --all --kind key            # show what is pending
+python tools/batch_queue.py --all --kind key --run --apply
+```
+
+`--all` walks every pending batch in queue order. It is resumable by
+construction: a batch is marked done only after its tool exits cleanly, and
+each tool keeps a per-question checkpoint, so interrupting and rerunning
+re-answers nothing.
+
+It **stops at the first failing batch** rather than continuing. A batch fails
+for a reason — usually an expired key or a rate limit — and ploughing on would
+burn through every remaining batch recording the same failure in each.
 
 ### Note on ordering
 
@@ -223,7 +286,11 @@ Two rules make the result mean anything:
 | Cleaned, unkeyed, ready | **6,934** (`data/staging/jamb_archive_unkeyed.csv`) |
 | Held back — need diagrams | 574 (`jamb_archive_needs_figure.csv`) |
 | Ground-truth validation set | 144 (`ground_truth.csv`) |
-| Already in the bank | 10,116, keys never audited |
+| Archive keying progress | **91/91 batches complete**, all 6,934 source questions reconciled |
+| Archive keying remaining | **0 batches**, 0 questions |
+| Approved archive questions active | **3,553** (3,380 consensus + 173 adjudicated) |
+| Held after final review | **866** (61 prior-review + 805 final-batch rows) |
+| Current bank | **15,927 total**: 13,470 active, 2,457 draft |
 
 The archive covers English, Literature, Government, Economics, Biology,
 Geography, Commerce and Accounting for 1990–2009 — years the bank currently has
