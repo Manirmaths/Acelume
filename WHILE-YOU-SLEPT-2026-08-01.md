@@ -58,7 +58,7 @@ inserts, raised for missing bind parameters, and rolled the transaction back.
 `sync_questions_db.py` now skips that empty update; a regression test proves a
 fresh SQLite database commits its first question import.
 
-### Final verification before production sync
+### Verification and production sync
 
 - **15,927 rows / 15,927 unique IDs**
 - **13,470 active, 2,457 draft**
@@ -76,6 +76,12 @@ fresh SQLite database commits its first question import.
 There are 825 older active questions with blank explanations. None belongs to
 this 3,553-question approved archive set; that pre-existing debt is recorded
 separately rather than hidden inside this continuation's clean result.
+
+The release was committed as `ff0f36a` and pushed to `main` on 2 August 2026.
+GitHub Actions dry run `30725002118` prepared 10,116 updates and 5,811 inserts
+with zero skipped rows. Live run `30725050305` then completed successfully with
+the same totals. A final read-only reconciliation (`30725386298`) fetched all
+15,927 production question IDs and reported **0 inserts missing and 0 skipped**.
 
 ## Continuation: 1,146 more questions, gated three ways
 
