@@ -7,8 +7,33 @@ from app.config import settings
 
 logger = logging.getLogger("naijaprep.database")
 
-connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(settings.DATABASE_URL, connect_args=connect_args)
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+connect_args = {"check_same_thread": False} if _is_sqlite else {}
+
+# Pool sizing exists because of one scenario: fifty candidates starting a
+# school exam within the same two minutes.
+#
+# FastAPI runs sync endpoints (which is all of ours) in a threadpool of ~40
+# threads, and every one of them wants a connection. SQLAlchemy's default pool
+# is 5 + 10 overflow, so the other twenty-five would queue for thirty seconds
+# and then raise -- a 500 in the middle of an exam, which is the one place in
+# the app with no second attempt.
+#
+# 20 is comfortably under Render Postgres's connection limit with a single
+# uvicorn worker, and above the threadpool's realistic concurrent demand.
+_pool_args: dict = {} if _is_sqlite else {
+    "pool_size": 10,
+    "max_overflow": 10,
+    "pool_timeout": 10,
+    # Managed Postgres drops idle connections. Without pre-ping the first
+    # request after a quiet spell fails with "server closed the connection
+    # unexpectedly" -- which, now that the service stays warm rather than
+    # restarting, is MORE likely than it was on the free plan, not less.
+    "pool_pre_ping": True,
+    "pool_recycle": 280,
+}
+
+engine = create_engine(settings.DATABASE_URL, connect_args=connect_args, **_pool_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

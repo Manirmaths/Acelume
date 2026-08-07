@@ -612,11 +612,10 @@ def _session_out(db: Session, session: ExamSession, include_counts: bool = True)
 
 
 def _paper(db: Session, session: ExamSession, candidate: ExamCandidate) -> ExamPaperOut:
-    questions = []
-    for qid in candidate.question_order or []:
-        payload = exams.question_payload(db, session, qid)
-        if payload:
-            questions.append(ExamQuestionOut(**payload))
+    questions = [
+        ExamQuestionOut(**payload)
+        for payload in exams.paper_payload(db, session, list(candidate.question_order or []))
+    ]
 
     return ExamPaperOut(
         title=session.title,

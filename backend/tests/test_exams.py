@@ -973,3 +973,96 @@ def test_a_candidate_mid_paper_keeps_their_order_through_a_reupload(client, db_s
     db_session.refresh(candidate)
 
     assert candidate.question_order == original
+
+
+# ------------------------------------------------------------- paper loading
+
+
+def test_building_a_paper_costs_one_query_not_one_per_question(db_session):
+    """
+    Fifty candidates starting a sixty-question exam within the same two
+    minutes must not become three thousand round trips.
+
+    This is the one moment in the app where slow means a school's exam does
+    not start, so the cost is pinned rather than left to drift.
+    """
+    from sqlalchemy import event
+
+    _seed_bank(db_session, n=80)
+    session = _session(db_session, count=60)
+    question_ids = list(session.question_ids)
+    assert len(question_ids) == 60
+
+    counter = {"n": 0}
+
+    def _count(conn, cursor, statement, params, context, executemany):
+        counter["n"] += 1
+
+    engine = db_session.get_bind()
+    event.listen(engine, "before_cursor_execute", _count)
+    try:
+        payload = exams.paper_payload(db_session, session, question_ids)
+    finally:
+        event.remove(engine, "before_cursor_execute", _count)
+
+    assert len(payload) == 60
+    assert counter["n"] == 1, f"{counter['n']} queries for a 60-question paper"
+
+
+def test_the_paper_comes_back_in_the_candidates_order(db_session):
+    _seed_bank(db_session, n=20)
+    session = _session(db_session, count=10)
+    order = list(reversed(session.question_ids))
+
+    payload = exams.paper_payload(db_session, session, order)
+    assert [p["id"] for p in payload] == order
+
+
+def test_the_paper_never_carries_a_correct_answer(db_session):
+    _seed_bank(db_session, n=20)
+    session = _session(db_session, count=5)
+
+    payload = exams.paper_payload(db_session, session, list(session.question_ids))
+    assert payload
+    for item in payload:
+        assert "correct_option" not in item
+        assert "explanation" not in item
+
+
+def test_a_question_deleted_since_registration_is_skipped_not_rendered_blank(db_session):
+    _seed_bank(db_session, n=20)
+    session = _session(db_session, count=5)
+    order = list(session.question_ids)
+
+    db_session.query(Question).filter(Question.id == order[2]).delete()
+    db_session.commit()
+
+    payload = exams.paper_payload(db_session, session, order)
+    assert [p["id"] for p in payload] == [order[0], order[1], order[3], order[4]]
+
+
+def test_an_uploaded_paper_cannot_reach_another_sessions_questions(client, db_session):
+    """
+    Uploaded questions are scoped to their session. A question_order naming an
+    id from a different school's paper must return nothing for it.
+    """
+    _admin(client, db_session)
+    mine = _session(db_session, source="upload")
+    theirs = _session(db_session, source="upload")
+
+    db_session.add(ExamQuestion(
+        session_id=mine.id, position=0, subject="English", question_text="Mine?",
+        option_a="A", option_b="B", option_c="C", option_d="D", correct_option="A",
+    ))
+    intruder = ExamQuestion(
+        session_id=theirs.id, position=0, subject="English", question_text="Theirs?",
+        option_a="A", option_b="B", option_c="C", option_d="D", correct_option="A",
+    )
+    db_session.add(intruder)
+    db_session.commit()
+
+    mine.question_ids = exams.build_paper(db_session, mine)
+    db_session.commit()
+
+    payload = exams.paper_payload(db_session, mine, mine.question_ids + [intruder.id])
+    assert [p["question_text"] for p in payload] == ["Mine?"]

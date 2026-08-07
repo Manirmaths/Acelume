@@ -370,6 +370,49 @@ def blueprint_shortfall(db: Session, blueprint: list[dict]) -> list[str]:
     return problems
 
 
+def paper_payload(db: Session, session: ExamSession, question_ids: list[int]) -> list[dict]:
+    """
+    The whole paper in ONE query, in the candidate's own order.
+
+    Was one query per question. Sixty questions times fifty candidates all
+    starting within a couple of minutes is three thousand round trips at
+    exactly the moment the exam must not be slow, and every one of them holds
+    a pooled connection while it waits.
+
+    Correct answers are not selected at all -- not fetched and then dropped,
+    simply never read out of the database.
+    """
+    if not question_ids:
+        return []
+
+    model = ExamQuestion if session.source == "upload" else Question
+    rows = (
+        db.query(
+            model.id, model.subject, model.topic, model.question_text,
+            model.image_url, model.option_a, model.option_b,
+            model.option_c, model.option_d,
+        )
+        .filter(model.id.in_(question_ids))
+        # Uploaded questions belong to one session. Scoping the query means a
+        # crafted question_order can never pull another school's paper.
+        .filter(ExamQuestion.session_id == session.id if session.source == "upload" else True)
+        .all()
+    )
+
+    by_id = {
+        row[0]: {
+            "id": row[0], "subject": row[1], "topic": row[2],
+            "question_text": row[3], "image_url": row[4],
+            "option_a": row[5], "option_b": row[6],
+            "option_c": row[7], "option_d": row[8],
+        }
+        for row in rows
+    }
+    # The candidate's order is authoritative, and a question that has since
+    # been deleted is skipped rather than rendered as a hole.
+    return [by_id[qid] for qid in question_ids if qid in by_id]
+
+
 def question_payload(db: Session, session: ExamSession, question_id: int) -> dict | None:
     """
     One question as the candidate sees it. Never includes the correct answer.

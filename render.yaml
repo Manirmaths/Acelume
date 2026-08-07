@@ -21,7 +21,15 @@ services:
   - type: web
     name: acelume-api
     runtime: python
-    plan: free
+    # STARTER, NOT FREE. Upgraded in the dashboard on 2026-08-07 and recorded
+    # here because this service is Blueprint-managed -- leaving `free` in this
+    # file means the next Blueprint sync silently downgrades it again.
+    #
+    # The free plan spins down after 15 minutes idle and takes ~50s to wake.
+    # That is survivable for a student practising alone; it is not survivable
+    # for a hall of fifty candidates whose first request of the morning times
+    # out. Starter also gives 0.5 CPU rather than 0.1.
+    plan: starter
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
