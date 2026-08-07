@@ -6,9 +6,11 @@ from app.ai import generate_lesson_note, suggest_tags
 from app.auth import require_admin
 from app.database import get_db
 from app.models import LessonNote, Question, Passage, User, UserResponse, ReviewQuestion, QuizAttempt, Payment
+from app import analytics
 from app.schemas import (
     QuestionIn, QuestionOut, AdminStats, PassageOut, AdminUserOut, SuggestTagsIn, SuggestTagsOut,
     LessonNoteOut, NoteGenerateIn, NoteStatusItem, NoteUpdateIn,
+    AnalyticsOut, CohortOut, FunnelOut, DailySignupOut,
 )
 from app.subjects import SUBJECTS
 
@@ -39,6 +41,44 @@ def stats(db: Session = Depends(get_db), _admin: User = Depends(require_admin)):
         total_questions=db.query(Question).count(),
         total_users=db.query(User).count(),
         subjects=SUBJECTS,
+    )
+
+
+@router.get("/analytics", response_model=AnalyticsOut)
+def analytics_view(
+    weeks: int = 8,
+    days: int = 30,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """
+    Cohort retention and the signup funnel.
+
+    Exists to answer one question: after a teacher introduces the app and then
+    stops mentioning it, do those students come back on their own? Totals
+    cannot answer that -- they only ever go up. See app/analytics.py.
+    """
+    weeks = max(1, min(weeks, 52))
+    days = max(1, min(days, 180))
+
+    rows = analytics.cohorts(db, weeks=weeks)
+    head = analytics.headline(db)
+    f = analytics.funnel(db, days=days)
+
+    return AnalyticsOut(
+        week_two_return_pct=head["week_two_return_pct"],
+        cohorts_measured=head["cohorts_measured"],
+        students_measured=head["students_measured"],
+        time_to_value_target_seconds=analytics.TIME_TO_VALUE_TARGET_SECONDS,
+        cohorts=[
+            CohortOut(
+                week_start=c.week_start, signups=c.signups, activated=c.activated,
+                d1=c.retention.get(1), d7=c.retention.get(7), d14=c.retention.get(14),
+            )
+            for c in rows
+        ],
+        funnel=FunnelOut(**vars(f)),
+        daily=[DailySignupOut(**d) for d in analytics.daily_signups(db, days=days)],
     )
 
 

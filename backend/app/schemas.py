@@ -761,6 +761,47 @@ class AdminStats(BaseModel):
     subjects: list[str]
 
 
+# ---------- Admin: Analytics ----------
+class CohortOut(BaseModel):
+    week_start: str
+    signups: int
+    # Answered at least one question, ever. The rest never started.
+    activated: int
+    # Percentage returning at each checkpoint. NULL means the cohort is too
+    # young to have an answer -- reporting 0 would make every recent week look
+    # like a failure.
+    d1: Optional[int] = None
+    d7: Optional[int] = None
+    d14: Optional[int] = None
+
+
+class FunnelOut(BaseModel):
+    signups: int
+    answered_one: int
+    answered_ten: int
+    completed_attempt: int
+    median_seconds_to_first_question: Optional[int] = None
+    # Share reaching their first question inside the 90s target.
+    within_target_pct: Optional[int] = None
+
+
+class DailySignupOut(BaseModel):
+    date: str
+    signups: int
+    activated: int
+
+
+class AnalyticsOut(BaseModel):
+    # The single number the teacher trial exists to produce.
+    week_two_return_pct: Optional[int] = None
+    cohorts_measured: int = 0
+    students_measured: int = 0
+    time_to_value_target_seconds: int
+    cohorts: list[CohortOut] = []
+    funnel: FunnelOut
+    daily: list[DailySignupOut] = []
+
+
 # ---------- Admin: Users ----------
 class AdminUserOut(BaseModel):
     id: int

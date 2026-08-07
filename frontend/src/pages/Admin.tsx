@@ -7,6 +7,7 @@ import type {
   Passage, QuestionSource, QuestionStatus, SuggestTagsResponse,
 } from '../api/types';
 import Card from '../components/ui/Card';
+import AdminAnalytics from '../components/AdminAnalytics';
 import Button from '../components/ui/Button';
 import Avatar from '../components/ui/Avatar';
 import { Input, Select, Textarea } from '../components/ui/Input';
@@ -68,7 +69,7 @@ const emptyNoteForm: NoteFormState = {
 export default function Admin() {
   const { user: me } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'questions' | 'users' | 'notes'>('questions');
+  const [tab, setTab] = useState<'questions' | 'users' | 'notes' | 'analytics'>('questions');
   const [subjectFilter, setSubjectFilter] = useState('');
   const [editing, setEditing] = useState<AdminQuestion | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -287,7 +288,15 @@ export default function Admin() {
         </div>
       )}
 
-      <div className="flex gap-1 mb-6 border-b border-ink-100">
+      <div className="flex gap-1 mb-6 border-b border-ink-100 overflow-x-auto">
+        <button
+          onClick={() => setTab('analytics')}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+            tab === 'analytics' ? 'border-brand-500 text-brand-700' : 'border-transparent text-ink-500 hover:text-ink-800'
+          }`}
+        >
+          <i className="fa-solid fa-chart-line mr-1.5" /> Retention
+        </button>
         <button
           onClick={() => setTab('questions')}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
@@ -314,7 +323,9 @@ export default function Admin() {
         </button>
       </div>
 
-      {tab === 'users' ? (
+      {tab === 'analytics' ? (
+        <AdminAnalytics />
+      ) : tab === 'users' ? (
         <>
           {userError && (
             <div className="bg-danger-50 text-danger-600 text-sm rounded-xl px-4 py-3 mb-4 flex items-center gap-2">

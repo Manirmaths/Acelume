@@ -696,3 +696,33 @@ export interface MySchool {
   last_week_national_rank: number | null;
   can_change_after: string | null;
 }
+
+/** One weekly signup cohort. Null retention = too young to know yet. */
+export interface Cohort {
+  week_start: string;
+  signups: number;
+  activated: number;
+  d1: number | null;
+  d7: number | null;
+  d14: number | null;
+}
+
+export interface AnalyticsFunnel {
+  signups: number;
+  answered_one: number;
+  answered_ten: number;
+  completed_attempt: number;
+  median_seconds_to_first_question: number | null;
+  within_target_pct: number | null;
+}
+
+export interface Analytics {
+  /** The single number a teacher trial exists to produce. */
+  week_two_return_pct: number | null;
+  cohorts_measured: number;
+  students_measured: number;
+  time_to_value_target_seconds: number;
+  cohorts: Cohort[];
+  funnel: AnalyticsFunnel;
+  daily: { date: string; signups: number; activated: number }[];
+}
