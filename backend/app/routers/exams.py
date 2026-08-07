@@ -34,6 +34,7 @@ from app.schemas import (
     ExamCandidateOut, ExamCreateIn, ExamPaperOut, ExamQuestionOut,
     ExamResultsOut, ExamSessionOut, ExamStartIn, ExamSubmitAnswerIn,
     ImportReportOut, CandidateResultOut, QuestionStatOut,
+    AddCandidatesIn, ReadinessOut, SubjectAvailabilityOut,
 )
 
 router = APIRouter(prefix="/api/exams", tags=["exams"])
@@ -251,16 +252,22 @@ async def upload_questions(
 @router.post("/manage/sessions/{session_id}/candidates", response_model=list[ExamCandidateOut])
 def add_candidates(
     session_id: int,
-    registrations: list[dict],
+    payload: AddCandidatesIn,
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
     """
-    Register candidates and issue access codes.
+    Register candidates. Registration numbers are GENERATED, never supplied.
 
-    This is the ONLY time an access code is returned in full. Print the sheet.
+    Two ways to add them, because schools differ: a count (for an entrance
+    exam where nobody is named yet, and slips are handed out at the door), or
+    a list of names and the school's own references.
+
+    The session stays a DRAFT. Nothing is usable until it is published.
     """
     session = _require_session(db, session_id)
+    if session.status == "closed":
+        raise HTTPException(status_code=400, detail="This exam is closed.")
 
     if not session.question_ids:
         session.question_ids = exams.build_paper(db, session)
@@ -270,20 +277,78 @@ def add_candidates(
                 detail="Add questions before registering candidates.",
             )
 
-    made = exams.create_candidates(db, session, registrations)
-    if session.status == "draft":
-        session.status = "ready"
+    entries = [e.model_dump() for e in payload.candidates]
+    if payload.count and payload.count > 0:
+        entries += [{} for _ in range(payload.count)]
+    if not entries:
+        raise HTTPException(status_code=400, detail="Give a number of candidates, or a list.")
+    if len(entries) > 500:
+        raise HTTPException(status_code=400, detail="That is more than 500 candidates.")
+
+    made = exams.create_candidates(db, session, entries)
     db.commit()
 
     return [
         ExamCandidateOut(
             registration_number=c.registration_number,
             full_name=c.full_name,
+            school_reference=c.school_reference,
             access_code=c.access_code,
             started=False, submitted=False, score=None,
         )
         for c in made
     ]
+
+
+@router.get("/manage/sessions/{session_id}/readiness", response_model=ReadinessOut)
+def check_readiness(
+    session_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """What is still missing before this exam can go out."""
+    session = _require_session(db, session_id)
+    return ReadinessOut(**exams.readiness(db, session))
+
+
+@router.post("/manage/sessions/{session_id}/publish", response_model=ExamSessionOut)
+def publish_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """
+    The final gate. Nothing works until this passes.
+
+    Deliberately explicit rather than a session becoming live the moment it has
+    a candidate: an exam that quietly went live half-configured is a much worse
+    failure than one that refuses to publish. Every requirement is re-checked
+    here, on the server, so the review screen cannot be bypassed.
+    """
+    session = _require_session(db, session_id)
+    state = exams.readiness(db, session)
+
+    if not state["ready"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Not ready to publish: " + " ".join(state["problems"]),
+        )
+
+    session.status = "ready"
+    db.commit()
+    db.refresh(session)
+    return _session_out(db, session)
+
+
+@router.get("/manage/subjects", response_model=list[SubjectAvailabilityOut])
+def subject_availability(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """
+    Bank questions available per subject.
+
+    Shown while the paper is being planned so "40 Commerce questions" is caught
+    as impossible while it is being typed, not on exam day.
+    """
+    return [SubjectAvailabilityOut(**row) for row in exams.subject_availability(db)]
 
 
 @router.get("/manage/sessions", response_model=list[ExamSessionOut])

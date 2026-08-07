@@ -58,7 +58,7 @@ def _session(db_session, admin_id=1, duration=50, count=10, open_now=True, sourc
 def _candidates(db_session, session, n=3):
     made = exams.create_candidates(
         db_session, session,
-        [{"registration_number": f"{i+1:03d}", "full_name": f"Student {i+1}"} for i in range(n)],
+        [{"full_name": f"Student {i+1}", "school_reference": f"{i+1:03d}"} for i in range(n)],
     )
     db_session.commit()
     return made
@@ -179,17 +179,198 @@ def test_a_candidate_gets_a_shuffled_paper(db_session):
     assert len(set(orders)) > 1, "different order"
 
 
-def test_registration_numbers_are_unique_within_a_session(db_session):
+def test_a_registration_number_matches_the_agreed_format(db_session):
+    """One letter, seven digits, two letters -- A1234567BC."""
     _seed_bank(db_session)
     session = _session(db_session)
-    exams.create_candidates(db_session, session, [{"registration_number": "001"}])
-    db_session.commit()
-    exams.create_candidates(db_session, session, [{"registration_number": "001"}])
+    candidate = _candidates(db_session, session, n=1)[0]
+    reg = candidate.registration_number
+
+    assert len(reg) == 10
+    assert reg[0].isalpha()
+    assert reg[1:8].isdigit()
+    assert reg[8:].isalpha()
+    assert reg.isupper()
+
+
+def test_easily_misread_letters_are_avoided(db_session):
+    """
+    I and O never appear. The format already disambiguates position, but a
+    number gets transcribed by hand from a printed slip by a teenager.
+    """
+    _seed_bank(db_session)
+    session = _session(db_session)
+    made = _candidates(db_session, session, n=40)
+
+    letters = "".join(c.registration_number[0] + c.registration_number[8:] for c in made)
+    assert "I" not in letters and "O" not in letters
+
+
+def test_registration_numbers_are_unique_across_different_sessions(db_session):
+    """
+    Globally unique, not per-session. Two schools both numbering from 001 was
+    exactly the problem generating them solves.
+    """
+    _seed_bank(db_session)
+    first = _session(db_session)
+    second = _session(db_session)
+
+    numbers = [c.registration_number for c in _candidates(db_session, first, n=25)]
+    numbers += [c.registration_number for c in _candidates(db_session, second, n=25)]
+
+    assert len(set(numbers)) == 50
+
+
+def test_a_number_is_never_reissued_even_after_the_candidate_is_deleted(db_session):
+    """
+    The ledger is the point. Deleting a session must not free its numbers back
+    into circulation -- one registration number appearing on two different
+    papers years apart would discredit the whole system.
+    """
+    from app.models import IssuedRegistration
+
+    _seed_bank(db_session)
+    session = _session(db_session)
+    candidate = _candidates(db_session, session, n=1)[0]
+    retired = candidate.registration_number
+
+    db_session.delete(candidate)
     db_session.commit()
 
-    assert db_session.query(ExamCandidate).filter(
-        ExamCandidate.session_id == session.id
-    ).count() == 1
+    assert db_session.query(IssuedRegistration).filter(
+        IssuedRegistration.number == retired
+    ).count() == 1, "the number stays reserved"
+
+    fresh = [c.registration_number for c in _candidates(db_session, session, n=30)]
+    assert retired not in fresh
+
+
+def test_the_school_keeps_its_own_reference(db_session):
+    """So a generated number can still be matched back to a class list."""
+    _seed_bank(db_session)
+    session = _session(db_session)
+    made = exams.create_candidates(
+        db_session, session, [{"full_name": "Amina Bello", "school_reference": "JSS3/014"}]
+    )
+    db_session.commit()
+
+    assert made[0].school_reference == "JSS3/014"
+    assert made[0].registration_number != "JSS3/014"
+
+
+def test_candidates_can_be_added_by_count_alone(db_session):
+    """An entrance exam has no names yet -- slips are handed out at the door."""
+    _seed_bank(db_session)
+    session = _session(db_session)
+    made = exams.create_candidates(db_session, session, [{} for _ in range(12)])
+    db_session.commit()
+
+    assert len(made) == 12
+    assert all(c.registration_number and c.access_code for c in made)
+    assert all(c.full_name is None for c in made)
+
+
+# --------------------------------------------------- multi-subject paper ----
+
+def test_a_paper_can_span_several_subjects(db_session):
+    """The interview/entrance case: three subjects, twenty questions each."""
+    for subject in ("Mathematics", "English", "Physics"):
+        _seed_bank(db_session, n=40, subject=subject)
+
+    now = datetime.utcnow()
+    session = ExamSession(
+        code=exams.unique_session_code(db_session),
+        title="Entrance Exam", organisation="FGC Sokoto", created_by=1,
+        blueprint=[
+            {"subject": "Mathematics", "count": 20},
+            {"subject": "English", "count": 20},
+            {"subject": "Physics", "count": 20},
+        ],
+        duration_minutes=60, source="bank",
+        opens_at=now - timedelta(hours=1), closes_at=now + timedelta(hours=6),
+        status="draft",
+    )
+    db_session.add(session)
+    db_session.commit()
+    session.question_ids = exams.build_paper(db_session, session)
+    db_session.commit()
+
+    assert len(session.question_ids) == 60
+
+    subjects = {
+        q.subject for q in
+        db_session.query(Question).filter(Question.id.in_(session.question_ids)).all()
+    }
+    assert subjects == {"Mathematics", "English", "Physics"}
+
+
+def test_subject_availability_reports_the_bank(db_session):
+    _seed_bank(db_session, n=35, subject="Mathematics")
+    rows = {r["subject"]: r["available"] for r in exams.subject_availability(db_session)}
+    assert rows["Mathematics"] == 35
+    assert rows["Chemistry"] == 0
+
+
+# ---------------------------------------------------------- publish gate ----
+
+def test_a_session_is_not_ready_until_everything_is_set(db_session):
+    """
+    An exam that quietly went live half-configured is a much worse failure
+    than one that refuses to publish.
+    """
+    _seed_bank(db_session)
+    session = _session(db_session)
+    session.status = "draft"
+    db_session.commit()
+
+    state = exams.readiness(db_session, session)
+    assert state["ready"] is False
+    assert any("candidate" in p.lower() for p in state["problems"])
+
+
+def test_a_fully_configured_session_is_ready(db_session):
+    _seed_bank(db_session)
+    session = _session(db_session)
+    _candidates(db_session, session, n=3)
+
+    state = exams.readiness(db_session, session)
+    assert state["ready"] is True, state["problems"]
+    assert state["candidates"] == 3
+
+
+def test_an_impossible_blueprint_blocks_publishing(db_session):
+    """Caught while it is a draft, not discovered in the hall."""
+    _seed_bank(db_session, n=10)
+    session = _session(db_session, count=40)
+    _candidates(db_session, session, n=3)
+
+    state = exams.readiness(db_session, session)
+    assert state["ready"] is False
+    assert any("only 10" in p for p in state["problems"])
+
+
+def test_publishing_is_refused_until_ready(client, db_session):
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session)
+    session.status = "draft"
+    db_session.commit()
+
+    res = client.post(f"/api/exams/manage/sessions/{session.id}/publish")
+    assert res.status_code == 400
+    assert "not ready" in res.json()["detail"].lower()
+
+
+def test_a_draft_is_invisible_to_candidates(client, db_session):
+    """No link works until the organiser has reviewed and published."""
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session)
+    session.status = "draft"
+    db_session.commit()
+    client.post("/api/auth/logout")
+
+    assert client.get(f"/api/exams/{session.code}").status_code == 404
 
 
 def test_the_clock_starts_on_the_server_and_cannot_be_extended(db_session):

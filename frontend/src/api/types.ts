@@ -787,8 +787,11 @@ export interface ExamPaper {
 
 /** Returned once, when candidates are created. Print it — codes aren't shown again. */
 export interface ExamCandidateIssued {
+  /** Generated: one letter, seven digits, two letters. Globally unique. */
   registration_number: string;
   full_name: string | null;
+  /** The school's own identifier, so results map back to their class list. */
+  school_reference: string | null;
   access_code: string | null;
 }
 
@@ -826,4 +829,19 @@ export interface ImportReport {
   /** Every bad row, not just the first — so a teacher can fix them all at once. */
   errors: { row: number; problem: string }[];
   fatal: string | null;
+}
+
+export interface SubjectAvailability {
+  subject: string;
+  available: number;
+}
+
+/** What is still missing before an exam can be published. */
+export interface Readiness {
+  ready: boolean;
+  problems: string[];
+  candidates: number;
+  questions: number;
+  subjects: number;
+  duration_minutes: number;
 }

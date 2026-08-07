@@ -43,8 +43,59 @@ ACCESS_CODE_LENGTH = 6
 SUBMIT_GRACE_SECONDS = 30
 
 
+# Registration number format: one letter, seven digits, two letters.
+# e.g. A1234567BC -- ten characters, unique across every exam ever run.
+#
+# I and O are excluded from the letter positions. The format itself already
+# disambiguates (position 1 is always a letter, so it cannot be a zero), but a
+# number gets transcribed by hand from a printed slip by a fourteen-year-old,
+# and removing the two characters people actually misread costs nothing.
+_REG_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+_REG_DIGITS = "0123456789"
+
+REGISTRATION_LENGTH = 10
+
+
 def _code(length: int) -> str:
     return "".join(secrets.choice(_ALPHABET) for _ in range(length))
+
+
+def _registration_candidate() -> str:
+    return (
+        secrets.choice(_REG_LETTERS)
+        + "".join(secrets.choice(_REG_DIGITS) for _ in range(7))
+        + "".join(secrets.choice(_REG_LETTERS) for _ in range(2))
+    )
+
+
+def issue_registration_number(db: Session) -> str:
+    """
+    Allocate a registration number that has never been issued before.
+
+    Reserved in IssuedRegistration immediately, and that row is never deleted.
+    Deleting a candidate or an entire session does not free the number back
+    into circulation -- a registration number appearing on two different papers
+    years apart would discredit the whole system.
+
+    The space is 24 x 10^7 x 24^2 = about 13.8 billion, so collisions are
+    vanishingly rare; the retry loop exists for correctness, not because it is
+    expected to run.
+    """
+    from app.models import IssuedRegistration
+
+    for _ in range(50):
+        number = _registration_candidate()
+        exists = (
+            db.query(IssuedRegistration)
+            .filter(IssuedRegistration.number == number)
+            .first()
+        )
+        if exists:
+            continue
+        db.add(IssuedRegistration(number=number))
+        db.flush()
+        return number
+    raise RuntimeError("could not allocate a unique registration number")
 
 
 def unique_session_code(db: Session) -> str:
@@ -56,49 +107,47 @@ def unique_session_code(db: Session) -> str:
 
 
 def create_candidates(
-    db: Session, session: ExamSession, registrations: list[dict]
+    db: Session, session: ExamSession, entries: list[dict]
 ) -> list[ExamCandidate]:
     """
-    Add candidates and issue their access codes.
+    Add candidates, generating a registration number and access code for each.
 
-    `registrations` is [{"registration_number": "001", "full_name": "..."}].
-    The name is optional throughout -- a school that prefers to keep its pupils
-    pseudonymous can hand out numbers only, and nothing downstream requires it.
+    `entries` is [{"full_name": "...", "school_reference": "..."}] -- both
+    optional. A school that wants to keep its pupils pseudonymous can add
+    candidates with neither, and simply hand out the slips in order.
+
+    The registration number is ALWAYS generated here, never taken from input.
+    Accepting the school's own numbering would mean two schools both starting
+    at 001, and would let a student guess a classmate's identity from the
+    pattern. Their own identifier goes in `school_reference` instead, purely so
+    results can be matched back to a class list.
 
     Question order is shuffled per candidate. Same paper, different sequence,
     which makes reading off the next screen along much harder without needing
     any invigilation software.
     """
-    existing = {
-        c.registration_number for c in
-        db.query(ExamCandidate).filter(ExamCandidate.session_id == session.id).all()
-    }
     used_codes = {
         c.access_code for c in
         db.query(ExamCandidate).filter(ExamCandidate.session_id == session.id).all()
     }
 
     made: list[ExamCandidate] = []
-    for entry in registrations:
-        reg = str(entry.get("registration_number", "")).strip()
-        if not reg or reg in existing:
-            continue
-
+    for entry in entries:
         for _ in range(20):
             code = _code(ACCESS_CODE_LENGTH)
             if code not in used_codes:
                 break
         used_codes.add(code)
-        existing.add(reg)
 
         order = list(session.question_ids or [])
         random.shuffle(order)
 
         candidate = ExamCandidate(
             session_id=session.id,
-            registration_number=reg,
+            registration_number=issue_registration_number(db),
             access_code=code,
             full_name=(entry.get("full_name") or "").strip() or None,
+            school_reference=(entry.get("school_reference") or "").strip() or None,
             question_order=order,
         )
         db.add(candidate)
@@ -106,6 +155,86 @@ def create_candidates(
 
     db.flush()
     return made
+
+
+def subject_availability(db: Session) -> list[dict]:
+    """
+    How many active bank questions exist per subject.
+
+    Shown while the paper is being planned, so "40 Commerce questions" is
+    caught as impossible at the point of typing it rather than on exam day.
+    """
+    from app.subjects import SUBJECTS
+
+    rows = []
+    for subject in SUBJECTS:
+        rows.append({
+            "subject": subject,
+            "available": (
+                db.query(Question)
+                .filter(Question.status == "active", Question.subject == subject)
+                .count()
+            ),
+        })
+    return rows
+
+
+def readiness(db: Session, session: ExamSession) -> dict:
+    """
+    Everything that must be true before an exam can be published.
+
+    Returns problems rather than raising, so the review screen can show a
+    checklist and the organiser can see exactly what is still missing. Nothing
+    is generated -- no link, no codes -- until every one of these passes.
+    """
+    from app.models import ExamQuestion
+
+    problems: list[str] = []
+
+    if not session.title.strip():
+        problems.append("The exam has no title.")
+    if not session.organisation.strip():
+        problems.append("No school or organisation is set.")
+    if session.duration_minutes < 5:
+        problems.append("The duration is too short.")
+    if session.closes_at <= session.opens_at:
+        problems.append("The exam closes before it opens.")
+
+    total_requested = sum(int(e.get("count") or 0) for e in (session.blueprint or []))
+
+    if session.source == "upload":
+        uploaded = (
+            db.query(ExamQuestion).filter(ExamQuestion.session_id == session.id).count()
+        )
+        if uploaded == 0:
+            problems.append("No questions have been uploaded yet.")
+    else:
+        if not session.blueprint:
+            problems.append("No subjects have been added.")
+        if total_requested == 0:
+            problems.append("No questions have been requested.")
+        for shortfall in blueprint_shortfall(db, session.blueprint or []):
+            problems.append(shortfall)
+
+    candidates = (
+        db.query(ExamCandidate).filter(ExamCandidate.session_id == session.id).count()
+    )
+    if candidates == 0:
+        problems.append("No candidates have been added yet.")
+
+    questions_ready = (
+        db.query(ExamQuestion).filter(ExamQuestion.session_id == session.id).count()
+        if session.source == "upload" else total_requested
+    )
+
+    return {
+        "ready": not problems,
+        "problems": problems,
+        "candidates": candidates,
+        "questions": questions_ready,
+        "subjects": len(session.blueprint or []),
+        "duration_minutes": session.duration_minutes,
+    }
 
 
 def build_paper(db: Session, session: ExamSession) -> list[int]:
