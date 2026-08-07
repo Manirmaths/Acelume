@@ -53,7 +53,7 @@ const NAV_ITEMS: NavItem[] = [
     to: '/progress',
     labelKey: 'nav.progress',
     icon: 'fa-solid fa-chart-line',
-    owns: ['/achievements', '/league', '/leaderboard', '/study-planner'],
+    owns: ['/achievements', '/league', '/leaderboard', '/study-planner', '/school'],
   },
   {
     to: '/profile',

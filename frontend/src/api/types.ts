@@ -652,3 +652,47 @@ export interface PracticeBot {
   blurb: string;
   is_bot: true;
 }
+
+/** A flat, actionable statement about the student's own data. */
+export interface Insight {
+  key: string;
+  icon: string;
+  text: string;
+  action_label: string | null;
+  action_href: string | null;
+}
+
+export interface School {
+  id: number;
+  slug: string;
+  name: string;
+  state: string | null;
+  /** community | claimed | verified — a student typing a name is only a claim. */
+  status: string;
+}
+
+export interface SchoolLeaderboardEntry {
+  rank: number;
+  school_id: number;
+  slug: string;
+  name: string;
+  state: string | null;
+  status: string;
+  total_points: number;
+  active_members: number;
+  /** The ranked figure — normalised so the table is not a size ranking. */
+  points_per_member: number;
+}
+
+export interface MySchool {
+  school: School;
+  total_points: number;
+  active_members: number;
+  points_per_member: number;
+  /** The only individual figure in the schools API, and only ever your own. */
+  your_contribution: number;
+  state_rank: number | null;
+  national_rank: number | null;
+  last_week_national_rank: number | null;
+  can_change_after: string | null;
+}

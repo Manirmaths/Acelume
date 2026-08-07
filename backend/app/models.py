@@ -931,6 +931,86 @@ class MasteryPointLedger(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class School(Base):
+    """
+    A school students can represent.
+
+    The Nigerian analogue of a chess.com Club is stronger than the chess one,
+    because the unit already exists and already competes -- inter-school
+    academic competition is a live cultural tradition here, not something the
+    product has to invent.
+
+    Membership is a CLAIM, not a verification. `status` records how much we
+    actually know. Nothing here should ever be presented as the school's own
+    endorsement until an educator has claimed it.
+    """
+    __tablename__ = "school"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    # Nigerian state, or equivalent region elsewhere. Free text rather than an
+    # enum: the list changes, and a wrong enum is harder to fix than a typo.
+    state: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    country_code: Mapped[str] = mapped_column(String(2), default="NG", nullable=False)
+
+    # community | claimed | verified
+    status: Mapped[str] = mapped_column(String(20), default="community", nullable=False)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("user.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SchoolMembership(Base):
+    """
+    One student's school.
+
+    One school at a time, with a cooldown on changing. Without the cooldown a
+    student could hop to whichever school was about to win that week, which
+    turns the whole competition into a farming exercise.
+    """
+    __tablename__ = "school_membership"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id"), nullable=False, unique=True, index=True
+    )
+    school_id: Mapped[int] = mapped_column(ForeignKey("school.id"), nullable=False, index=True)
+    joined_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # Separate from joined_at so the cooldown survives a re-join to the same
+    # school without granting a free switch.
+    last_changed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SchoolWeek(Base):
+    """
+    A school's finished week, frozen at close.
+
+    Stored rather than recomputed so a past week cannot silently change when a
+    student later joins, leaves, or is excluded by fair play. A leaderboard
+    that rewrites its own history is not a leaderboard.
+    """
+    __tablename__ = "school_week"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    school_id: Mapped[int] = mapped_column(ForeignKey("school.id"), nullable=False, index=True)
+    week_start: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+
+    total_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    active_members: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # The ranked figure. Normalised per active member so a 2,000-student school
+    # does not beat a 200-student one purely on headcount -- without this the
+    # table is a size ranking wearing an effort ranking's clothes.
+    points_per_member: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    state_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    national_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    closed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("school_id", "week_start", name="uq_school_week"),
+    )
+
+
 class SubjectRating(Base):
     """
     A student's Glicko-2 rating in one subject.

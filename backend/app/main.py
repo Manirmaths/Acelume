@@ -10,7 +10,7 @@ from app import models  # noqa: F401 -- ensure models are registered before crea
 from app.routers import (
     auth, subjects, quiz, dashboard, review, admin, leaderboard, blitz, mock, achievements,
     smart_review, tutor, notifications, study_planner, flashcards, public, notes, payments, family,
-    quest, missions, leagues, battles, daily_question, rush,
+    quest, missions, leagues, battles, daily_question, rush, schools,
 )
 
 # Interactive API docs (Swagger/ReDoc) pull scripts from a CDN and expose the
@@ -92,6 +92,7 @@ app.include_router(leagues.router)
 app.include_router(battles.router)
 app.include_router(daily_question.router)
 app.include_router(rush.router)
+app.include_router(schools.router)
 
 
 @app.get("/api/health")

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app import fair_play
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import QuizAttempt, User, UserResponse, Question
@@ -47,13 +48,31 @@ def get_leaderboard(
     return _subject_leaderboard(db, user, subject)
 
 
+def _exclude_flagged(db: Session, users: list[User], viewer: User) -> list[User]:
+    """
+    Drop fair-play-flagged accounts from a public board.
+
+    Silent, and never applied to the viewer's own row -- a student must always
+    be able to see themselves. Nobody is told anything about anybody: a
+    flagged account simply stops appearing, keeps every learning feature, and
+    is never accused of anything. See app/fair_play.py.
+    """
+    candidates = [u.id for u in users if u.id != viewer.id]
+    if not candidates:
+        return users
+    flagged = fair_play.excluded_user_ids(db, candidates)
+    return [u for u in users if u.id == viewer.id or u.id not in flagged]
+
+
 def _overall_leaderboard(db: Session, user: User) -> LeaderboardOut:
     top_users = (
         db.query(User)
         .order_by(User.points.desc(), User.id.asc())
-        .limit(TOP_N)
+        # Over-fetch so removing flagged accounts still fills the board.
+        .limit(TOP_N * 2)
         .all()
     )
+    top_users = _exclude_flagged(db, top_users, user)[:TOP_N]
 
     entries = [
         LeaderboardEntry(

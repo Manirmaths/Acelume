@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import type { Dashboard as DashboardData } from '../api/types';
 import Card from '../components/ui/Card';
 import HubGrid, { type HubLink } from '../components/ui/HubGrid';
+import Insights from '../components/Insights';
 
 function Stat({ icon, label, value, tone }: { icon: string; label: string; value: string | number; tone: string }) {
   return (
@@ -30,6 +31,12 @@ export default function ProgressHub() {
       icon: 'fa-solid fa-medal',
       title: 'Achievements',
       description: 'What you have unlocked, and what is close.',
+    },
+    {
+      to: '/school',
+      icon: 'fa-solid fa-school',
+      title: 'Your school',
+      description: 'Represent your school and see how it ranks in your state and nationally.',
     },
     {
       to: '/league',
@@ -82,6 +89,8 @@ export default function ProgressHub() {
           tone="bg-ink-100 text-ink-500"
         />
       </div>
+
+      <Insights />
 
       <HubGrid links={links} />
     </div>

@@ -122,6 +122,59 @@ class BlitzStartIn(BaseModel):
     difficulty: Optional[str] = None  # easy | medium | hard
 
 
+# ---------- Schools ----------
+class SchoolOut(BaseModel):
+    id: int
+    slug: str
+    name: str
+    state: Optional[str] = None
+    # community | claimed | verified. A student typing a name is a claim, not
+    # the school's endorsement -- the UI must not present the two the same way.
+    status: str
+
+
+class SchoolJoinIn(BaseModel):
+    school_id: Optional[int] = None
+    name: Optional[str] = None
+    state: Optional[str] = None
+
+
+class SchoolLeaderboardEntry(BaseModel):
+    rank: int
+    school_id: int
+    slug: str
+    name: str
+    state: Optional[str] = None
+    status: str
+    total_points: int
+    active_members: int
+    # The ranked figure. Normalised so the table is not a size ranking.
+    points_per_member: float
+
+
+class MySchoolOut(BaseModel):
+    school: SchoolOut
+    total_points: int
+    active_members: int
+    points_per_member: float
+    # The ONLY individual figure in the schools API, and only ever the
+    # requesting student's own. Never another child's.
+    your_contribution: int
+    state_rank: Optional[int] = None
+    national_rank: Optional[int] = None
+    last_week_national_rank: Optional[int] = None
+    can_change_after: Optional[str] = None
+
+
+# ---------- Insights ----------
+class InsightOut(BaseModel):
+    key: str
+    icon: str
+    text: str
+    action_label: Optional[str] = None
+    action_href: Optional[str] = None
+
+
 class RushStateOut(BaseModel):
     """Live state of a Rush run -- score, strikes and the bar to beat."""
     attempt_id: int

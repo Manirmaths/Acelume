@@ -9,12 +9,13 @@ from sqlalchemy import func
 
 from app.models import UserResponse, ReviewQuestion, Question, QuizAttempt, User, QuestionMastery
 from app.progress import compute_progress
+from app import insights as insights_lib
 from app import rating_service
 from app.subjects import SUBJECTS
 from app.gamification import config
 from app.schemas import (
     DashboardOut, DailyGoalIn, LevelOut, UnfinishedAttempt, UserOut, PracticeDay,
-    SubjectRatingOut,
+    SubjectRatingOut, InsightOut,
 )
 
 DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"]
@@ -42,6 +43,18 @@ def get_ratings(db: Session = Depends(get_db), user: User = Depends(get_current_
             out.append(SubjectRatingOut(**summary))
     out.sort(key=lambda r: r.predicted_score, reverse=True)
     return out
+
+
+@router.get("/insights", response_model=list[InsightOut])
+def get_insights(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """
+    Flat statements about what is actually costing this student marks.
+
+    Returns an empty list freely. A student whose data holds nothing
+    surprising should be told nothing rather than given filler -- see
+    app/insights.py for the three tests each statement has to pass.
+    """
+    return [InsightOut(**vars(i)) for i in insights_lib.for_user(db, user.id)]
 
 
 @router.get("", response_model=DashboardOut)

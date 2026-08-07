@@ -10,10 +10,17 @@ Status: partly BUILT as of 2026-08-07. Companion document: `PRODUCT-ARCHITECTURE
 | 4 | Answer-quality labels + accuracy | **Built** — `app/answer_labels.py` |
 | 5 | Daily Question | **Built** — `app/routers/daily_question.py` |
 | 6 | Rush mode | **Built** — `app/routers/rush.py` |
-| 7 | School clubs | Not started |
-| 8 | Arenas | Not started |
-| 9 | Insights as sentences | Not started |
-| 10 | Fair play | Not started — now needed, since ratings exist |
+| 7 | School clubs | **Built** — `app/schools.py` |
+| 8 | Arenas | **Deliberately not built** — see below |
+| 9 | Insights as sentences | **Built** — `app/insights.py` |
+| 10 | Fair play | **Built** — `app/fair_play.py` |
+
+**Arenas (§8) are the one thing deliberately left unbuilt.** They are cheap —
+the same points machinery on a different clock — but §8 gates them on roughly
+200 concurrent users, and below that an arena leaderboard reads as empty and
+does active harm. Building it now would mean shipping a feature designed to
+look popular, at a moment when it cannot. Revisit when the concurrency is
+there; the note in §8 is the trigger.
 
 The sections below are kept as written, because the reasoning is why each
 thing was built the way it was. Where the implementation departs from the
