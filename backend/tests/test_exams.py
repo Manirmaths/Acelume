@@ -651,3 +651,164 @@ def test_the_csv_export_carries_every_candidate(client, db_session):
     body = res.text
     for c in made:
         assert c.registration_number in body
+
+
+# ------------------------------------------- slips, editing and deletion ----
+
+def test_access_codes_can_be_retrieved_after_creation(client, db_session):
+    """
+    The first version showed access codes exactly once and never again. Close
+    the tab before printing and fifty students cannot sit the exam, with no way
+    to recover. An access code is not a secret from the organiser -- it is
+    theirs to hand out.
+    """
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session)
+    made = _candidates(db_session, session, n=3)
+    expected = {c.access_code for c in made}
+
+    rows = client.get(f"/api/exams/manage/sessions/{session.id}/candidates").json()
+    assert {r["access_code"] for r in rows} == expected
+
+
+def test_the_slips_csv_carries_codes_and_a_header(client, db_session):
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session)
+    made = _candidates(db_session, session, n=3)
+
+    res = client.get(f"/api/exams/manage/sessions/{session.id}/slips.csv")
+    assert res.status_code == 200
+    body = res.text
+
+    assert "Registration number,Name,School reference,Access code" in body
+    for c in made:
+        assert c.registration_number in body
+        assert c.access_code in body
+
+
+def test_the_results_csv_has_a_header_row_and_context(client, db_session):
+    """
+    A results file lands in a school's records and gets opened six months
+    later, so it has to say which exam it belongs to on its own.
+    """
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session, count=10)
+    for c in _candidates(db_session, session, n=2):
+        exams.submit(db_session, session, c)
+    db_session.commit()
+
+    body = client.get(f"/api/exams/manage/sessions/{session.id}/results.csv").text
+    assert "Registration number,Name,School reference,Score,Out of,Percent,Status" in body
+    assert session.title in body
+    assert session.organisation in body
+
+
+def test_csv_downloads_carry_a_bom_for_excel(client, db_session):
+    """
+    Without it, Excel on Windows opens UTF-8 as Latin-1 and a candidate named
+    Zainab Muhammad-Buhari comes out mangled in the school's own records.
+    """
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session)
+    _candidates(db_session, session, n=1)
+
+    assert client.get(f"/api/exams/manage/sessions/{session.id}/slips.csv").text.startswith("﻿")
+
+
+def test_slips_are_admin_only(client, register_user, db_session):
+    _seed_bank(db_session)
+    session = _session(db_session)
+    _candidates(db_session, session, n=1)
+    register_user()
+
+    assert client.get(f"/api/exams/manage/sessions/{session.id}/slips.csv").status_code == 403
+    assert client.get(f"/api/exams/manage/sessions/{session.id}/candidates").status_code == 403
+
+
+def test_timing_can_be_corrected_before_anyone_starts(client, db_session):
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session)
+    _candidates(db_session, session, n=2)
+
+    new_close = (datetime.utcnow() + timedelta(days=3)).isoformat()
+    res = client.patch(f"/api/exams/manage/sessions/{session.id}", json={
+        "duration_minutes": 90, "closes_at": new_close,
+    })
+    assert res.status_code == 200, res.text
+    assert res.json()["duration_minutes"] == 90
+
+
+def test_an_exam_in_progress_cannot_be_edited(client, db_session):
+    """
+    Changing the duration under someone mid-paper would be indefensible. A
+    school has to be able to trust that the rules cannot move.
+    """
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session)
+    candidate = _candidates(db_session, session, n=1)[0]
+    candidate.started_at = datetime.utcnow()
+    db_session.commit()
+
+    res = client.patch(f"/api/exams/manage/sessions/{session.id}", json={"duration_minutes": 300})
+    assert res.status_code == 409
+
+
+def test_an_exam_nobody_sat_can_be_deleted(client, db_session):
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session)
+    _candidates(db_session, session, n=2)
+
+    assert client.delete(f"/api/exams/manage/sessions/{session.id}").status_code == 204
+    assert db_session.query(ExamSession).filter(ExamSession.id == session.id).count() == 0
+
+
+def test_deleting_an_exam_does_not_free_its_registration_numbers(client, db_session):
+    """
+    The ledger outlives the exam. A number reappearing on a later paper would
+    discredit the whole system.
+    """
+    from app.models import IssuedRegistration
+
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session)
+    numbers = [c.registration_number for c in _candidates(db_session, session, n=3)]
+
+    client.delete(f"/api/exams/manage/sessions/{session.id}")
+
+    kept = {
+        r.number for r in
+        db_session.query(IssuedRegistration).filter(IssuedRegistration.number.in_(numbers)).all()
+    }
+    assert kept == set(numbers)
+
+
+def test_an_exam_that_has_been_sat_cannot_be_deleted(client, db_session):
+    """Those are real results belonging to a school."""
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session)
+    candidate = _candidates(db_session, session, n=1)[0]
+    candidate.started_at = datetime.utcnow()
+    db_session.commit()
+
+    assert client.delete(f"/api/exams/manage/sessions/{session.id}").status_code == 409
+
+
+def test_editing_cannot_invert_the_window(client, db_session):
+    _seed_bank(db_session)
+    _admin(client, db_session)
+    session = _session(db_session)
+
+    res = client.patch(f"/api/exams/manage/sessions/{session.id}", json={
+        "opens_at": (datetime.utcnow() + timedelta(days=5)).isoformat(),
+        "closes_at": (datetime.utcnow() + timedelta(days=1)).isoformat(),
+    })
+    assert res.status_code == 400

@@ -34,7 +34,7 @@ from app.schemas import (
     ExamCandidateOut, ExamCreateIn, ExamPaperOut, ExamQuestionOut,
     ExamResultsOut, ExamSessionOut, ExamStartIn, ExamSubmitAnswerIn,
     ImportReportOut, CandidateResultOut, QuestionStatOut,
-    AddCandidatesIn, ReadinessOut, SubjectAvailabilityOut,
+    AddCandidatesIn, ReadinessOut, SubjectAvailabilityOut, ExamUpdateIn,
 )
 
 router = APIRouter(prefix="/api/exams", tags=["exams"])
@@ -379,20 +379,187 @@ def results_csv(session_id: int, db: Session = Depends(get_db), admin: User = De
     db.commit()
 
     data = _results(db, session)
+    references = {
+        c.registration_number: c.school_reference
+        for c in db.query(ExamCandidate).filter(ExamCandidate.session_id == session.id).all()
+    }
+
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["Registration number", "Name", "Score", "Total", "Percent", "Status", "Submitted at"])
+    # Context rows first: a results file that lands in a school's records six
+    # months later has to say which exam it belongs to on its own.
+    writer.writerow(["Exam", session.title])
+    writer.writerow(["School", session.organisation])
+    writer.writerow(["Exam code", session.code])
+    writer.writerow(["Questions", len(session.question_ids or [])])
+    writer.writerow(["Time allowed (minutes)", session.duration_minutes])
+    writer.writerow([])
+    writer.writerow([
+        "Registration number", "Name", "School reference",
+        "Score", "Out of", "Percent", "Status", "Submitted at (UTC)",
+    ])
     for row in data.candidates:
         writer.writerow([
-            row.registration_number, row.full_name or "", row.score, row.total,
-            f"{row.percent}%", row.status, row.submitted_at or "",
+            row.registration_number,
+            row.full_name or "",
+            references.get(row.registration_number) or "",
+            row.score, row.total, row.percent,
+            row.status,
+            row.submitted_at or "",
         ])
 
+    return _csv_response(buffer, f"{session.code}-results.csv")
+
+
+@router.get("/manage/sessions/{session_id}/slips.csv")
+def slips_csv(session_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """
+    The candidate slips: registration number, name and ACCESS CODE.
+
+    The first version showed access codes exactly once, at creation, and never
+    again. That sounded principled and was unusable -- close the tab before
+    printing and fifty students cannot sit the exam, with no way to recover.
+
+    An access code is not a secret from the organiser. It is the organiser's to
+    distribute; withholding it from the person whose job is handing it out was
+    security theatre that broke the actual workflow. It stays secret from
+    everyone else, which is the part that matters.
+    """
+    session = _require_session(db, session_id)
+    rows = (
+        db.query(ExamCandidate)
+        .filter(ExamCandidate.session_id == session.id)
+        .order_by(ExamCandidate.id)
+        .all()
+    )
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["Exam", session.title])
+    writer.writerow(["School", session.organisation])
+    writer.writerow(["Link", f"/exam/{session.code}"])
+    writer.writerow([])
+    writer.writerow(["Registration number", "Name", "School reference", "Access code"])
+    for c in rows:
+        writer.writerow([
+            c.registration_number, c.full_name or "", c.school_reference or "", c.access_code,
+        ])
+
+    return _csv_response(buffer, f"{session.code}-candidate-slips.csv")
+
+
+@router.get("/manage/sessions/{session_id}/candidates", response_model=list[ExamCandidateOut])
+def list_candidates(
+    session_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Candidates with their access codes, so slips can be reprinted."""
+    session = _require_session(db, session_id)
+    rows = (
+        db.query(ExamCandidate)
+        .filter(ExamCandidate.session_id == session.id)
+        .order_by(ExamCandidate.id)
+        .all()
+    )
+    return [
+        ExamCandidateOut(
+            registration_number=c.registration_number,
+            full_name=c.full_name,
+            school_reference=c.school_reference,
+            access_code=c.access_code,
+            started=c.started_at is not None,
+            submitted=c.submitted_at is not None,
+            score=c.score if c.submitted_at else None,
+        )
+        for c in rows
+    ]
+
+
+@router.patch("/manage/sessions/{session_id}", response_model=ExamSessionOut)
+def update_session(
+    session_id: int,
+    payload: ExamUpdateIn,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """
+    Change the details of an exam that has not started.
+
+    Editing stops the moment a candidate begins: changing the duration or the
+    window under someone mid-paper would be indefensible, and a school needs to
+    trust that the rules cannot move once the exam is running.
+    """
+    session = _require_session(db, session_id)
+
+    started = (
+        db.query(ExamCandidate)
+        .filter(ExamCandidate.session_id == session.id, ExamCandidate.started_at.isnot(None))
+        .count()
+    )
+    if started:
+        raise HTTPException(
+            status_code=409,
+            detail="Candidates have already started. The exam can no longer be edited.",
+        )
+
+    for field in ("title", "organisation", "duration_minutes", "opens_at", "closes_at", "show_answers"):
+        value = getattr(payload, field)
+        if value is not None:
+            setattr(session, field, value)
+
+    if session.closes_at <= session.opens_at:
+        raise HTTPException(status_code=400, detail="The exam must close after it opens.")
+
+    db.commit()
+    db.refresh(session)
+    return _session_out(db, session)
+
+
+@router.delete("/manage/sessions/{session_id}", status_code=204)
+def delete_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """
+    Remove an exam nobody has sat.
+
+    Refused once anyone has started, because those are real results belonging
+    to a school. Registration numbers stay reserved in IssuedRegistration --
+    deleting the exam must never free them back into circulation.
+    """
+    session = _require_session(db, session_id)
+
+    started = (
+        db.query(ExamCandidate)
+        .filter(ExamCandidate.session_id == session.id, ExamCandidate.started_at.isnot(None))
+        .count()
+    )
+    if started:
+        raise HTTPException(
+            status_code=409,
+            detail="Candidates have already sat this exam. It cannot be deleted.",
+        )
+
+    db.query(ExamCandidate).filter(ExamCandidate.session_id == session.id).delete()
+    db.query(ExamQuestion).filter(ExamQuestion.session_id == session.id).delete()
+    db.delete(session)
+    db.commit()
+
+
+def _csv_response(buffer: io.StringIO, filename: str) -> StreamingResponse:
+    """
+    A downloadable CSV.
+
+    The BOM matters: without it Excel on Windows opens a UTF-8 file as
+    Latin-1, so a candidate named Zainab Muhammad-Bùhari comes out mangled in
+    the school's own records.
+    """
     buffer.seek(0)
-    filename = f"{session.code}-results.csv"
     return StreamingResponse(
-        iter([buffer.getvalue()]),
-        media_type="text/csv",
+        iter(["\ufeff" + buffer.getvalue()]),
+        media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

@@ -47,6 +47,32 @@ function describe(error: unknown, fallback: string): string {
   return `${error.message} (HTTP ${error.status})`;
 }
 
+/**
+ * `datetime-local` wants "YYYY-MM-DDTHH:mm" in LOCAL time, with no timezone.
+ * Everything is converted to UTC before it reaches the API — an admin in
+ * Lagos setting 9am must not produce a 10am exam.
+ */
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Sensible defaults: opens tomorrow morning, closes a week later. A default of
+// "now" would let a half-checked exam be sat the moment it is published.
+const defaultOpensAt = (() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(8, 0, 0, 0);
+  return toLocalInput(d);
+})();
+
+const defaultClosesAt = (() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 8);
+  d.setHours(17, 0, 0, 0);
+  return toLocalInput(d);
+})();
+
 interface SubjectRow {
   subject: string;
   count: number;
@@ -59,7 +85,8 @@ export default function ExamBuilder({ onCreated }: { onCreated: () => void }) {
   const [title, setTitle] = useState('');
   const [organisation, setOrganisation] = useState('');
   const [duration, setDuration] = useState(60);
-  const [openDays, setOpenDays] = useState(7);
+  const [opensAt, setOpensAt] = useState(defaultOpensAt);
+  const [closesAt, setClosesAt] = useState(defaultClosesAt);
   const [showAnswers, setShowAnswers] = useState(false);
 
   // Step 2 — questions
@@ -100,8 +127,10 @@ export default function ExamBuilder({ onCreated }: { onCreated: () => void }) {
         blueprint: source === 'bank' ? rows : [],
         duration_minutes: duration,
         source,
-        opens_at: new Date().toISOString(),
-        closes_at: new Date(Date.now() + openDays * 86400000).toISOString(),
+        // Sent as UTC. The inputs are the ADMIN'S local time, so converting
+        // here is what stops a 9am exam in Lagos opening at 10am.
+        opens_at: new Date(opensAt).toISOString(),
+        closes_at: new Date(closesAt).toISOString(),
         show_answers: showAnswers,
       });
       setSession(created);
@@ -228,11 +257,27 @@ export default function ExamBuilder({ onCreated }: { onCreated: () => void }) {
             </Field>
 
             <Field
-              label="Exam stays open for"
-              hint="In DAYS. The window candidates may sit it within — useful when a school rotates classes through one computer lab."
-              htmlFor="ex-days"
+              label="Exam opens"
+              hint="Your local time. Candidates cannot start before this."
+              htmlFor="ex-opens"
             >
-              <TextInput id="ex-days" type="number" min={1} max={90} value={openDays} onChange={(v) => setOpenDays(Number(v))} />
+              <input
+                id="ex-opens" type="datetime-local" value={opensAt}
+                onChange={(e) => setOpensAt(e.target.value)}
+                className="w-full rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+              />
+            </Field>
+
+            <Field
+              label="Exam closes"
+              hint="After this nobody can start. Useful when a school rotates classes through one computer lab."
+              htmlFor="ex-closes"
+            >
+              <input
+                id="ex-closes" type="datetime-local" value={closesAt}
+                onChange={(e) => setClosesAt(e.target.value)}
+                className="w-full rounded-xl border border-ink-200 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+              />
             </Field>
           </div>
 
@@ -472,6 +517,8 @@ export default function ExamBuilder({ onCreated }: { onCreated: () => void }) {
               ['Questions', `${readiness?.questions ?? session.question_count}`],
               ['Subjects', source === 'upload' ? "School's own upload" : `${readiness?.subjects ?? rows.length}`],
               ['Time allowed', `${session.duration_minutes} minutes per candidate`],
+              ['Opens', new Date(session.opens_at).toLocaleString()],
+              ['Closes', new Date(session.closes_at).toLocaleString()],
               ['Candidates', `${readiness?.candidates ?? 0}`],
               ['Answers shown', session.show_answers ? 'Yes' : 'No'],
             ].map(([label, value]) => (

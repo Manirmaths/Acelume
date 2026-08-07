@@ -141,6 +141,19 @@ class ExamCreateIn(BaseModel):
     show_answers: bool = False
 
 
+class ExamUpdateIn(BaseModel):
+    """
+    Editing an exam that has not started. Every field optional -- only what is
+    sent gets changed.
+    """
+    title: Optional[str] = Field(default=None, min_length=2, max_length=200)
+    organisation: Optional[str] = Field(default=None, min_length=2, max_length=200)
+    duration_minutes: Optional[int] = Field(default=None, ge=5, le=300)
+    opens_at: Optional[datetime] = None
+    closes_at: Optional[datetime] = None
+    show_answers: Optional[bool] = None
+
+
 class ExamSessionOut(BaseModel):
     id: int
     code: str
