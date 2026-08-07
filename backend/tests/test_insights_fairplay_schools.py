@@ -490,3 +490,81 @@ def test_a_student_sees_only_their_own_contribution(db_session):
     _award(db_session, other, week, 999, "other-1")
 
     assert schools_lib.contribution(db_session, me.id, week) == 42
+
+
+# ------------------------------------------------- batched exclusion ----
+
+def test_batched_exclusion_agrees_with_the_per_user_check(db_session):
+    """
+    excluded_user_ids() is a hand-rolled aggregate rewrite of assess(), which
+    exists purely for speed. Two implementations of the same rule WILL drift
+    apart eventually; this is the test that notices.
+    """
+    honest = _user(db_session, username="honest")
+    for i in range(60):
+        _respond(db_session, honest, _question(db_session, i=i), correct=True, seconds=25)
+
+    cheat = _user(db_session, username="tooquick")
+    for i in range(60):
+        _respond(db_session, cheat, _question(db_session, i=500 + i), correct=True, seconds=0)
+
+    ids = [honest.id, cheat.id]
+    batched = fair_play.excluded_user_ids(db_session, ids)
+    per_user = {uid for uid in ids if fair_play.assess(db_session, uid).excluded}
+
+    assert batched == per_user == {cheat.id}
+
+
+def test_batched_exclusion_is_a_fixed_number_of_queries(db_session):
+    """
+    The bug this guards against: the obvious implementation costs three
+    queries PER USER, so a 100-row leaderboard becomes 300 round-trips on
+    every render. Fine on SQLite locally, not fine on a free-tier Postgres.
+    """
+    from sqlalchemy import event
+
+    users = []
+    for n in range(25):
+        u = _user(db_session, username=f"bulk{n}")
+        for i in range(35):
+            _respond(db_session, u, _question(db_session, i=n * 100 + i), correct=True, seconds=20)
+        users.append(u)
+
+    # Materialise the ids BEFORE counting: commit() expires the ORM objects,
+    # so reading u.id inside the measured window would count the test's own
+    # refresh SELECTs against the function under test.
+    user_ids = [u.id for u in users]
+
+    counter = {"n": 0}
+
+    def _count(conn, cursor, statement, params, context, executemany):
+        counter["n"] += 1
+
+    engine = db_session.get_bind()
+    event.listen(engine, "before_cursor_execute", _count)
+    try:
+        fair_play.excluded_user_ids(db_session, user_ids)
+    finally:
+        event.remove(engine, "before_cursor_execute", _count)
+
+    assert counter["n"] <= 4, (
+        f"{counter['n']} queries for 25 users -- cost must not scale per user"
+    )
+
+
+def test_batched_exclusion_handles_an_empty_candidate_list(db_session):
+    assert fair_play.excluded_user_ids(db_session, []) == set()
+
+
+def test_a_user_with_no_timing_data_is_never_excluded(db_session):
+    """Older accounts predate answer_seconds and must not be penalised for it."""
+    user = _user(db_session, username="notiming")
+    for i in range(60):
+        r = UserResponse(
+            user_id=user.id, question_id=_question(db_session, i=800 + i).id,
+            selected_option="B", is_correct=True, answer_seconds=None,
+        )
+        db_session.add(r)
+    db_session.commit()
+
+    assert fair_play.excluded_user_ids(db_session, [user.id]) == set()

@@ -27,7 +27,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.models import Question, QuizAttempt, SubjectRating, UserResponse
@@ -191,10 +191,78 @@ def assess(db: Session, user_id: int) -> Assessment:
 
 def excluded_user_ids(db: Session, candidate_ids: list[int]) -> set[int]:
     """
-    Filter a leaderboard or school total.
+    Filter a leaderboard or school total, in a FIXED number of queries.
 
-    Takes the candidate list rather than scanning every user, so the cost
-    scales with what is being displayed rather than with the size of the user
-    base.
+    The obvious implementation is `{uid for uid in ids if assess(...).excluded}`,
+    and it is a trap: assess() costs three queries, so a 100-row leaderboard
+    becomes 300 round-trips on every render. That is fine on a laptop against
+    SQLite and not fine on a free-tier Postgres with real students on it.
+
+    This does the same work as two aggregate queries over the whole candidate
+    set, so cost is flat in the number of users being ranked.
+
+    The repeat-set check from assess() is deliberately NOT included here: it
+    needs per-user attempt contents, cannot be expressed as an aggregate, and
+    is the weakest of the three signals. It still runs in assess() for
+    individual review. Leaderboard filtering uses the two signals that are
+    both strong and cheap.
     """
-    return {uid for uid in candidate_ids if assess(db, uid).excluded}
+    if not candidate_ids:
+        return set()
+
+    excluded: set[int] = set()
+
+    # 1. Impossibly fast correct answers, as one grouped aggregate.
+    speed_rows = (
+        db.query(
+            UserResponse.user_id,
+            func.count(UserResponse.id).label("total"),
+            func.sum(
+                case((UserResponse.answer_seconds < MIN_PLAUSIBLE_SECONDS, 1), else_=0)
+            ).label("too_fast"),
+            func.sum(
+                case(
+                    (
+                        (UserResponse.answer_seconds < MIN_PLAUSIBLE_SECONDS)
+                        & (UserResponse.is_correct.is_(True)),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("too_fast_correct"),
+        )
+        .filter(
+            UserResponse.user_id.in_(candidate_ids),
+            UserResponse.answer_seconds.isnot(None),
+        )
+        .group_by(UserResponse.user_id)
+        .all()
+    )
+
+    for user_id, total, too_fast, too_fast_correct in speed_rows:
+        total = int(total or 0)
+        too_fast = int(too_fast or 0)
+        too_fast_correct = int(too_fast_correct or 0)
+        if total < MIN_SAMPLE or too_fast == 0:
+            continue
+        if round(100 * too_fast / total) < IMPLAUSIBLE_SHARE_PCT:
+            continue
+        # Fast AND right. Fast and wrong is a student clicking through
+        # something they gave up on, which is not cheating.
+        if round(100 * too_fast_correct / too_fast) >= 60:
+            excluded.add(user_id)
+
+    # 2. Settled ratings that leapt, as one filtered query.
+    jump_rows = (
+        db.query(SubjectRating.user_id)
+        .filter(
+            SubjectRating.user_id.in_(candidate_ids),
+            SubjectRating.deviation <= SETTLED_DEVIATION,
+            (SubjectRating.rating - SubjectRating.week_start_rating) >= IMPLAUSIBLE_WEEKLY_GAIN,
+        )
+        .distinct()
+        .all()
+    )
+    excluded.update(uid for (uid,) in jump_rows)
+
+    return excluded
