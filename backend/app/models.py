@@ -931,6 +931,137 @@ class MasteryPointLedger(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class ExamSession(Base):
+    """
+    A test a school runs for its own students.
+
+    This is the first thing in Acelume a school would pay for, and it is a
+    different product shape from everything else here: the school is the
+    customer, the students are the users, and the deliverable is a results
+    spreadsheet rather than a learning habit.
+
+    Two design decisions run through the whole feature:
+
+      - **Candidates do not have accounts.** Fifty students registering with
+        email inside a fifty-minute exam slot is a disaster -- a third will not
+        have an email address and you lose a quarter of the paper to signup.
+        They get a link, a registration number and an access code, which is
+        exactly how a CBT centre already works. It also means no personal data
+        is collected from a minor at all: just a name the school already holds.
+
+      - **Window timing, not synchronous.** Most Nigerian secondary schools do
+        not have fifty devices; they have a lab of twenty and rotate classes
+        through it. A fixed 9am start would force a constraint the school
+        cannot meet. Each candidate's clock starts when THEY start.
+    """
+    __tablename__ = "exam_session"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Short, unambiguous, printable on a slip of paper.
+    code: Mapped[str] = mapped_column(String(12), unique=True, nullable=False, index=True)
+
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    organisation: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_by: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
+
+    # [{"subject": "Mathematics", "count": 40}, ...]. Stored rather than
+    # derived so the blueprint survives even if the question bank changes.
+    blueprint: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
+
+    # "bank" (Acelume's questions) | "upload" (the school's own).
+    source: Mapped[str] = mapped_column(String(10), default="bank", nullable=False)
+
+    # The paper. Fixed at creation so every candidate faces the same questions;
+    # ORDER is shuffled per candidate, not membership.
+    question_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    # The window the exam is open. Outside it, a code will not start a paper.
+    opens_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    closes_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    # draft | ready | closed. A draft has no candidates and no paper yet.
+    status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
+
+    # Whether candidates see correct answers after submitting. Off by default:
+    # a school running the same paper across two days does not want the first
+    # group handing answers to the second.
+    show_answers: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ExamCandidate(Base):
+    """
+    One student's place in an exam. No account, no email, no password.
+
+    The registration number is whatever the school already uses -- an exam
+    number, an admission number, a class list position. Acelume does not care
+    what it means, only that the school can map it back to a pupil. Pairing it
+    with a secret access code is what stops a student sitting the paper twice
+    under someone else's number.
+
+    `question_order` is per-candidate. Everyone gets the same questions in a
+    different sequence, which makes copying from the next screen along much
+    harder without needing invigilation software.
+    """
+    __tablename__ = "exam_candidate"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("exam_session.id"), nullable=False, index=True)
+
+    registration_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    # Secret. Printed once on the candidate's slip and never shown again.
+    access_code: Mapped[str] = mapped_column(String(12), nullable=False, index=True)
+    # Optional -- some schools hand out numbers only, others want names on the
+    # results sheet. Never required, so a school can stay pseudonymous.
+    full_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+    question_order: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # {"<question_id>": "B", ...}
+    answers: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    __table_args__ = (
+        # A registration number is unique WITHIN a session, not globally --
+        # two schools may both number their candidates from 001.
+        UniqueConstraint("session_id", "registration_number", name="uq_exam_candidate_reg"),
+        UniqueConstraint("session_id", "access_code", name="uq_exam_candidate_code"),
+    )
+
+
+class ExamQuestion(Base):
+    """
+    A question uploaded by a school, kept apart from the main bank.
+
+    Deliberately NOT written into `question`: school-uploaded content has not
+    been through Acelume's editorial process, may be copied from a textbook,
+    and belongs to the school rather than to us. Mixing it into the bank that
+    students practise from would put unreviewed material in front of everyone
+    and quietly create a rights problem.
+    """
+    __tablename__ = "exam_question"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("exam_session.id"), nullable=False, index=True)
+
+    subject: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    topic: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    option_a: Mapped[str] = mapped_column(Text, nullable=False)
+    option_b: Mapped[str] = mapped_column(Text, nullable=False)
+    option_c: Mapped[str] = mapped_column(Text, nullable=False)
+    option_d: Mapped[str] = mapped_column(Text, nullable=False)
+    correct_option: Mapped[str] = mapped_column(String(1), nullable=False)
+    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
 class School(Base):
     """
     A school students can represent.

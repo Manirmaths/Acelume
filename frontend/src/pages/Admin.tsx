@@ -8,6 +8,7 @@ import type {
 } from '../api/types';
 import Card from '../components/ui/Card';
 import AdminAnalytics from '../components/AdminAnalytics';
+import AdminExams from '../components/AdminExams';
 import Button from '../components/ui/Button';
 import Avatar from '../components/ui/Avatar';
 import { Input, Select, Textarea } from '../components/ui/Input';
@@ -69,7 +70,7 @@ const emptyNoteForm: NoteFormState = {
 export default function Admin() {
   const { user: me } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<'questions' | 'users' | 'notes' | 'analytics'>('questions');
+  const [tab, setTab] = useState<'questions' | 'users' | 'notes' | 'analytics' | 'exams'>('questions');
   const [subjectFilter, setSubjectFilter] = useState('');
   const [editing, setEditing] = useState<AdminQuestion | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -298,6 +299,14 @@ export default function Admin() {
           <i className="fa-solid fa-chart-line mr-1.5" /> Retention
         </button>
         <button
+          onClick={() => setTab('exams')}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
+            tab === 'exams' ? 'border-brand-500 text-brand-700' : 'border-transparent text-ink-500 hover:text-ink-800'
+          }`}
+        >
+          <i className="fa-solid fa-file-pen mr-1.5" /> Exams
+        </button>
+        <button
           onClick={() => setTab('questions')}
           className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
             tab === 'questions' ? 'border-brand-500 text-brand-700' : 'border-transparent text-ink-500 hover:text-ink-800'
@@ -323,7 +332,9 @@ export default function Admin() {
         </button>
       </div>
 
-      {tab === 'analytics' ? (
+      {tab === 'exams' ? (
+        <AdminExams />
+      ) : tab === 'analytics' ? (
         <AdminAnalytics />
       ) : tab === 'users' ? (
         <>

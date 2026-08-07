@@ -22,3 +22,5 @@ slowapi==0.1.9
 # streak logic appears to do nothing locally while working fine on Render's
 # Linux hosts. Harmless (unused) on Linux, essential on Windows.
 tzdata==2025.2
+# Reading school-uploaded question spreadsheets (app/exam_import.py).
+openpyxl==3.1.5

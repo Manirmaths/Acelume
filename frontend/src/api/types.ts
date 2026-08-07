@@ -741,3 +741,89 @@ export interface RecentOpponent {
   last_played: string | null;
   played: number;
 }
+
+/* ---------- School exam sessions ---------- */
+
+export interface ExamSessionInfo {
+  id: number;
+  code: string;
+  title: string;
+  organisation: string;
+  duration_minutes: number;
+  source: string;
+  status: string;
+  question_count: number;
+  opens_at: string;
+  closes_at: string;
+  show_answers: boolean;
+  registered: number;
+  started: number;
+  submitted: number;
+  is_open: boolean;
+}
+
+export interface ExamQuestionPublic {
+  id: number;
+  subject: string | null;
+  topic: string | null;
+  question_text: string;
+  image_url: string | null;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+}
+
+export interface ExamPaper {
+  title: string;
+  organisation: string;
+  registration_number: string;
+  full_name: string | null;
+  /** From the server, computed from when they started. Never trusted to the client. */
+  seconds_remaining: number;
+  questions: ExamQuestionPublic[];
+  answers: Record<string, string>;
+}
+
+/** Returned once, when candidates are created. Print it — codes aren't shown again. */
+export interface ExamCandidateIssued {
+  registration_number: string;
+  full_name: string | null;
+  access_code: string | null;
+}
+
+export interface CandidateResult {
+  registration_number: string;
+  full_name: string | null;
+  score: number;
+  total: number;
+  percent: number;
+  submitted_at: string | null;
+  status: string;
+  answers_shown: boolean;
+}
+
+export interface QuestionStat {
+  question_id: number;
+  question_text: string;
+  topic: string | null;
+  attempted: number;
+  correct: number;
+  percent_correct: number;
+}
+
+export interface ExamResults {
+  session: ExamSessionInfo;
+  candidates: CandidateResult[];
+  average_percent: number | null;
+  highest: number | null;
+  lowest: number | null;
+  hardest_questions: QuestionStat[];
+}
+
+export interface ImportReport {
+  imported: number;
+  /** Every bad row, not just the first — so a teacher can fix them all at once. */
+  errors: { row: number; problem: string }[];
+  fatal: string | null;
+}

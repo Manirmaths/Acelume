@@ -122,6 +122,130 @@ class BlitzStartIn(BaseModel):
     difficulty: Optional[str] = None  # easy | medium | hard
 
 
+# ---------- Exam sessions (schools running their own tests) ----------
+class BlueprintEntry(BaseModel):
+    subject: str
+    count: int = Field(ge=1, le=200)
+
+
+class ExamCreateIn(BaseModel):
+    title: str = Field(min_length=2, max_length=200)
+    organisation: str = Field(min_length=2, max_length=200)
+    blueprint: list[BlueprintEntry] = []
+    duration_minutes: int = Field(ge=5, le=300)
+    source: str = "bank"          # bank | upload
+    opens_at: datetime
+    closes_at: datetime
+    # Off by default: a school running the same paper across two days does not
+    # want the first group handing answers to the second.
+    show_answers: bool = False
+
+
+class ExamSessionOut(BaseModel):
+    id: int
+    code: str
+    title: str
+    organisation: str
+    duration_minutes: int
+    source: str
+    status: str
+    question_count: int
+    opens_at: str
+    closes_at: str
+    show_answers: bool
+    registered: int = 0
+    started: int = 0
+    submitted: int = 0
+    is_open: bool = False
+
+
+class ExamCandidateOut(BaseModel):
+    registration_number: str
+    full_name: Optional[str] = None
+    # Returned ONLY when candidates are first created. Print the sheet.
+    access_code: Optional[str] = None
+    started: bool = False
+    submitted: bool = False
+    score: Optional[int] = None
+
+
+class ExamStartIn(BaseModel):
+    """The whole credential. No account, no email, no password."""
+    registration_number: str
+    access_code: str
+
+
+class ExamSubmitAnswerIn(ExamStartIn):
+    question_id: int
+    selected_option: Optional[str] = None   # None clears the answer
+
+
+class ExamQuestionOut(BaseModel):
+    """As the candidate sees it -- never carries the correct answer."""
+    id: int
+    subject: Optional[str] = None
+    topic: Optional[str] = None
+    question_text: str
+    image_url: Optional[str] = None
+    option_a: str
+    option_b: str
+    option_c: str
+    option_d: str
+
+
+class ExamPaperOut(BaseModel):
+    title: str
+    organisation: str
+    registration_number: str
+    full_name: Optional[str] = None
+    # Computed server-side from started_at. A wrong phone clock buys nothing.
+    seconds_remaining: int
+    questions: list[ExamQuestionOut]
+    answers: dict = {}
+
+
+class ImportRowError(BaseModel):
+    row: int
+    problem: str
+
+
+class ImportReportOut(BaseModel):
+    imported: int
+    # Every bad row, not just the first -- see app/exam_import.py.
+    errors: list[ImportRowError] = []
+    fatal: Optional[str] = None
+
+
+class CandidateResultOut(BaseModel):
+    registration_number: str
+    full_name: Optional[str] = None
+    score: int
+    total: int
+    percent: int
+    submitted_at: Optional[str] = None
+    status: str = "submitted"
+    answers_shown: bool = False
+
+
+class QuestionStatOut(BaseModel):
+    """Which questions the class as a whole failed -- where to teach next."""
+    question_id: int
+    question_text: str
+    topic: Optional[str] = None
+    attempted: int
+    correct: int
+    percent_correct: int
+
+
+class ExamResultsOut(BaseModel):
+    session: ExamSessionOut
+    candidates: list[CandidateResultOut]
+    average_percent: Optional[int] = None
+    highest: Optional[int] = None
+    lowest: Optional[int] = None
+    hardest_questions: list[QuestionStatOut] = []
+
+
 # ---------- Schools ----------
 class SchoolOut(BaseModel):
     id: int

@@ -33,6 +33,7 @@ const Leaderboard = lazy(() => import('./pages/Leaderboard'));
 const Blitz = lazy(() => import('./pages/Blitz'));
 const Rush = lazy(() => import('./pages/Rush'));
 const SchoolPage = lazy(() => import('./pages/SchoolPage'));
+const SitExam = lazy(() => import('./pages/SitExam'));
 const Mock = lazy(() => import('./pages/Mock'));
 const MockExam = lazy(() => import('./pages/MockExam'));
 const PaymentCallback = lazy(() => import('./pages/PaymentCallback'));
@@ -71,6 +72,8 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/delete-account" element={<DeleteAccount />} />
+          {/* Candidates sit exams with no account at all — see SitExam.tsx. */}
+          <Route path="/exam/:code" element={<SitExam />} />
           <Route path="*" element={<NotFound />} />
         </Route>
 
