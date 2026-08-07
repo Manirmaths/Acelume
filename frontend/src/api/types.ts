@@ -785,7 +785,7 @@ export interface ExamPaper {
   answers: Record<string, string>;
 }
 
-/** Returned once, when candidates are created. Print it — codes aren't shown again. */
+/** Returned when candidates are created. Also re-readable via the slips CSV. */
 export interface ExamCandidateIssued {
   /** Generated: one letter, seven digits, two letters. Globally unique. */
   registration_number: string;

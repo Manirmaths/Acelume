@@ -240,6 +240,9 @@ async def upload_questions(
 
     session.source = "upload"
     session.question_ids = exams.build_paper(db, session)
+    # Candidates registered against the previous upload hold an order pointing
+    # at rows we just deleted. Re-draw it for anyone who has not started.
+    exams.reissue_orders(db, session)
     db.commit()
 
     return ImportReportOut(

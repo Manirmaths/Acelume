@@ -812,3 +812,164 @@ def test_editing_cannot_invert_the_window(client, db_session):
         "closes_at": (datetime.utcnow() + timedelta(days=1)).isoformat(),
     })
     assert res.status_code == 400
+
+
+# --------------------------------------------------------------- subject order
+
+
+def _multi_subject_session(db_session, blueprint):
+    now = datetime.utcnow()
+    s = ExamSession(
+        code=exams.unique_session_code(db_session),
+        title="Entrance Exam", organisation="FGC Sokoto", created_by=1,
+        blueprint=blueprint, duration_minutes=50, source="bank",
+        opens_at=now - timedelta(hours=1), closes_at=now + timedelta(hours=6),
+        status="ready",
+    )
+    db_session.add(s)
+    db_session.commit()
+    s.question_ids = exams.build_paper(db_session, s)
+    db_session.commit()
+    return s
+
+
+def _subjects_in_order(db_session, session, ids):
+    lookup = {
+        q.id: q.subject for q in
+        db_session.query(Question).filter(Question.id.in_(ids)).all()
+    }
+    return [lookup[i] for i in ids]
+
+
+def test_a_multi_subject_paper_is_never_interleaved(db_session):
+    """
+    English 1-20 then Maths 1-20, not forty questions in a blender.
+
+    The per-candidate shuffle exists to stop copying off the next screen. It
+    must not cost the candidate the ability to see where a subject ends.
+    """
+    _seed_bank(db_session, n=30, subject="English")
+    _seed_bank(db_session, n=30, subject="Mathematics")
+    session = _multi_subject_session(db_session, [
+        {"subject": "English", "count": 20},
+        {"subject": "Mathematics", "count": 20},
+    ])
+
+    candidates = exams.create_candidates(db_session, session, [{}, {}, {}])
+    db_session.commit()
+
+    for candidate in candidates:
+        order = _subjects_in_order(db_session, session, candidate.question_order)
+        assert order == ["English"] * 20 + ["Mathematics"] * 20
+
+
+def test_subject_blocks_follow_the_examiners_order(db_session):
+    """Maths first if that is how the examiner wrote the blueprint."""
+    _seed_bank(db_session, n=25, subject="English")
+    _seed_bank(db_session, n=25, subject="Mathematics")
+    session = _multi_subject_session(db_session, [
+        {"subject": "Mathematics", "count": 5},
+        {"subject": "English", "count": 5},
+    ])
+
+    blocks = exams.subject_blocks(db_session, session)
+    assert [b[0] for b in blocks] == ["Mathematics", "English"]
+    assert [len(b[1]) for b in blocks] == [5, 5]
+
+
+def test_the_shuffle_still_varies_within_a_subject(db_session):
+    """
+    Blocking must not quietly turn into 'everyone gets the same paper'.
+
+    Twenty questions have 20! orders, so two candidates matching would be a
+    bug rather than luck.
+    """
+    _seed_bank(db_session, n=30, subject="English")
+    session = _multi_subject_session(db_session, [{"subject": "English", "count": 20}])
+
+    a, b = exams.create_candidates(db_session, session, [{}, {}])
+    db_session.commit()
+
+    assert set(a.question_order) == set(b.question_order)
+    assert a.question_order != b.question_order
+
+
+def test_reupload_redraws_the_order_for_candidates_who_have_not_started(client, db_session):
+    """
+    A corrected question file must not leave registered candidates holding an
+    order that points at deleted rows -- they would open a half-empty paper.
+    """
+    _admin(client, db_session)
+    session = _session(db_session, source="upload")
+
+    for position in range(4):
+        db_session.add(ExamQuestion(
+            session_id=session.id, position=position, subject="English",
+            question_text=f"Old {position}?", option_a="A", option_b="B",
+            option_c="C", option_d="D", correct_option="A",
+        ))
+    db_session.commit()
+    session.question_ids = exams.build_paper(db_session, session)
+    db_session.commit()
+
+    candidate = exams.create_candidates(db_session, session, [{}])[0]
+    db_session.commit()
+    stale_order = list(candidate.question_order)
+
+    # SIX questions, not four. SQLite reuses the deleted rows' ids, so a length
+    # change is the only assertion that a stale order cannot accidentally pass.
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["subject", "question", "option_a", "option_b", "option_c", "option_d", "correct"])
+    for i in range(6):
+        ws.append(["English", f"New {i}?", "A", "B", "C", "D", "A"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    res = client.post(
+        f"/api/exams/manage/sessions/{session.id}/questions",
+        files={"file": ("q.xlsx", buf.getvalue(),
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert res.status_code == 200
+
+    db_session.refresh(candidate)
+    assert len(stale_order) == 4
+    assert len(candidate.question_order) == 6
+    assert set(candidate.question_order) == set(session.question_ids)
+
+    # And every one of them resolves to a live row on the new paper.
+    texts = {
+        q.question_text for q in
+        db_session.query(ExamQuestion)
+        .filter(ExamQuestion.id.in_(candidate.question_order))
+        .all()
+    }
+    assert texts == {f"New {i}?" for i in range(6)}
+
+
+def test_a_candidate_mid_paper_keeps_their_order_through_a_reupload(client, db_session):
+    """Changing the exam under someone already sitting it is worse than a stale one."""
+    _admin(client, db_session)
+    session = _session(db_session, source="upload")
+    for position in range(3):
+        db_session.add(ExamQuestion(
+            session_id=session.id, position=position, subject="English",
+            question_text=f"Q{position}?", option_a="A", option_b="B",
+            option_c="C", option_d="D", correct_option="A",
+        ))
+    db_session.commit()
+    session.question_ids = exams.build_paper(db_session, session)
+    db_session.commit()
+
+    candidate = exams.create_candidates(db_session, session, [{}])[0]
+    candidate.started_at = datetime.utcnow()
+    db_session.commit()
+    original = list(candidate.question_order)
+
+    exams.reissue_orders(db_session, session)
+    db_session.commit()
+    db_session.refresh(candidate)
+
+    assert candidate.question_order == original

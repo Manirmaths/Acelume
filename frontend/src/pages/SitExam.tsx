@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, ApiError } from '../api/client';
 import type { ExamPaper, ExamSessionInfo, CandidateResult } from '../api/types';
@@ -8,6 +8,28 @@ import MathText from '../components/ui/MathText';
 import QuestionText from '../components/ui/QuestionText';
 
 const OPTION_KEYS = ['A', 'B', 'C', 'D'] as const;
+
+type Section = { subject: string; start: number; count: number };
+
+/**
+ * Split the paper into subject sections.
+ *
+ * Read off consecutive runs of `subject` rather than grouping by name,
+ * because the server already emits the paper subject-blocked (see
+ * `exams.subject_blocks`) and a run is exactly what the candidate sees. If a
+ * subject ever did appear twice it would show as two sections, which is the
+ * honest rendering of a paper that genuinely looks like that.
+ */
+function sectionsOf(questions: { subject?: string | null }[]): Section[] {
+  const out: Section[] = [];
+  questions.forEach((q, i) => {
+    const subject = q.subject || '';
+    const last = out[out.length - 1];
+    if (last && last.subject === subject) last.count += 1;
+    else out.push({ subject, start: i, count: 1 });
+  });
+  return out;
+}
 
 /**
  * Sitting a school exam. Public route — no account, no login.
@@ -115,6 +137,12 @@ export default function SitExam() {
     }
   };
 
+  const sections = useMemo(() => sectionsOf(paper?.questions ?? []), [paper]);
+  const section = useMemo(
+    () => sections.find((s) => index >= s.start && index < s.start + s.count),
+    [sections, index]
+  );
+
   // ---------------------------------------------------------------- done
 
   if (result) {
@@ -211,13 +239,23 @@ export default function SitExam() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 pb-28">
-      <div className="flex items-center justify-between gap-3 mb-4">
+      {/*
+        Exam-paper letterhead. A candidate glancing down mid-paper should be
+        able to confirm they are sitting the right exam under the right number
+        without leaving the screen -- and an invigilator walking the room can
+        check a screen against the slip in one look.
+      */}
+      <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
-          <p className="font-display font-bold text-ink-900 truncate">{paper.title}</p>
-          <p className="text-xs text-ink-400">{paper.registration_number}</p>
+          <p className="font-display font-extrabold text-ink-900 truncate">{paper.title}</p>
+          <p className="text-xs text-ink-500 truncate">{paper.organisation}</p>
+          <p className="text-sm text-ink-700 mt-1.5 truncate">
+            {paper.full_name && <span className="font-semibold">{paper.full_name} · </span>}
+            <span className="font-mono">{paper.registration_number}</span>
+          </p>
         </div>
         <div
-          className={`font-mono font-bold tabular-nums text-lg px-3 py-1.5 rounded-xl ${
+          className={`font-mono font-bold tabular-nums text-lg px-3 py-1.5 rounded-xl shrink-0 ${
             urgent ? 'bg-danger-50 text-danger-600' : 'bg-ink-100 text-ink-700'
           }`}
           role="timer"
@@ -226,8 +264,23 @@ export default function SitExam() {
         </div>
       </div>
 
+      {/*
+        Section heading. Numbering is per subject, because that is the unit the
+        candidate budgets time in -- "12 of 20 in Mathematics" tells them
+        something "32 of 60" does not.
+      */}
+      {section && section.subject && (
+        <div className="border-l-4 border-brand-500 pl-3 mb-3">
+          <p className="font-display font-bold text-ink-900">{section.subject}</p>
+          <p className="text-xs text-ink-500">
+            Question {index - section.start + 1} of {section.count}
+          </p>
+        </div>
+      )}
+
       <p className="text-xs text-ink-400 mb-3">
-        Question {index + 1} of {paper.questions.length} · {answered} answered
+        {(!section || !section.subject) && `Question ${index + 1} of ${paper.questions.length} · `}
+        {answered} of {paper.questions.length} answered
         {saving && <span className="ml-2 text-ink-300">saving…</span>}
       </p>
 
@@ -268,22 +321,48 @@ export default function SitExam() {
         </div>
       </Card>
 
-      {/* Question grid — an exam needs free navigation, not a forced march. */}
-      <div className="flex flex-wrap gap-1.5 mb-6">
-        {paper.questions.map((q, i) => (
-          <button
-            key={q.id}
-            onClick={() => setIndex(i)}
-            className={`w-9 h-9 rounded-lg text-xs font-semibold border ${
-              i === index
-                ? 'border-brand-500 bg-brand-500 text-white'
-                : answers[String(q.id)]
-                  ? 'border-brand-200 bg-brand-50 text-brand-700'
-                  : 'border-ink-200 text-ink-400'
-            }`}
-          >
-            {i + 1}
-          </button>
+      {/*
+        Question grid — an exam needs free navigation, not a forced march.
+        Split by subject so "how much Maths have I left?" is answerable at a
+        glance, and numbered within the subject to match the heading above.
+      */}
+      <div className="space-y-4 mb-6">
+        {sections.map((s) => (
+          <div key={`${s.subject}-${s.start}`}>
+            {s.subject && (
+              <p className="text-xs font-semibold text-ink-500 mb-1.5">
+                {s.subject}
+                <span className="font-normal text-ink-400">
+                  {' · '}
+                  {paper.questions
+                    .slice(s.start, s.start + s.count)
+                    .filter((q) => answers[String(q.id)]).length}
+                  /{s.count} answered
+                </span>
+              </p>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {paper.questions.slice(s.start, s.start + s.count).map((q, i) => {
+                const position = s.start + i;
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => setIndex(position)}
+                    aria-label={`${s.subject || 'Question'} ${i + 1}`}
+                    className={`w-9 h-9 rounded-lg text-xs font-semibold border ${
+                      position === index
+                        ? 'border-brand-500 bg-brand-500 text-white'
+                        : answers[String(q.id)]
+                          ? 'border-brand-200 bg-brand-50 text-brand-700'
+                          : 'border-ink-200 text-ink-400'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         ))}
       </div>
 

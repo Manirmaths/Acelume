@@ -106,6 +106,85 @@ def unique_session_code(db: Session) -> str:
     raise RuntimeError("could not allocate an exam session code")
 
 
+def subject_blocks(db: Session, session: ExamSession) -> list[tuple[str, list[int]]]:
+    """
+    The paper split into subject sections, in the examiner's own order.
+
+    A multi-subject paper is a sequence of papers: English 1-20, then
+    Mathematics 21-40. Interleaving them is not a harder exam, it is a worse
+    one -- the candidate pays a context-switch cost twenty times over that has
+    nothing to do with what is being measured, and cannot budget time per
+    subject because they cannot see where a subject ends.
+
+    Order comes from `session.question_ids`, which `build_paper` already emits
+    blueprint-first, so this preserves whatever the examiner set up. Questions
+    with no subject recorded are grouped under "" and kept last.
+    """
+    ids = list(session.question_ids or [])
+    if not ids:
+        return []
+
+    subjects = _subject_lookup(db, session, ids)
+
+    blocks: list[tuple[str, list[int]]] = []
+    index: dict[str, list[int]] = {}
+    for qid in ids:
+        name = subjects.get(qid) or ""
+        if name not in index:
+            index[name] = []
+            blocks.append((name, index[name]))
+        index[name].append(qid)
+
+    # Unlabelled questions trail the named ones rather than opening the paper.
+    return sorted(blocks, key=lambda b: b[0] == "")
+
+
+def _subject_lookup(db: Session, session: ExamSession, ids: list[int]) -> dict[int, str]:
+    model = ExamQuestion if session.source == "upload" else Question
+    rows = db.query(model.id, model.subject).filter(model.id.in_(ids)).all()
+    return {row[0]: row[1] for row in rows}
+
+
+def candidate_order(db: Session, session: ExamSession) -> list[int]:
+    """
+    A per-candidate question order: shuffled WITHIN each subject, never across.
+
+    The shuffle exists so the screen next along shows a different question at
+    the same moment, which is most of what invigilation software buys without
+    installing anything. Confining it to the subject block keeps that property
+    while leaving the paper's structure intact.
+    """
+    order: list[int] = []
+    for _subject, block in subject_blocks(db, session):
+        shuffled = list(block)
+        random.shuffle(shuffled)
+        order.extend(shuffled)
+    return order
+
+
+def reissue_orders(db: Session, session: ExamSession) -> int:
+    """
+    Re-draw the question order for candidates who have not started yet.
+
+    Re-uploading a corrected question file replaces the paper, which would
+    otherwise leave already-registered candidates holding an order that points
+    at deleted rows -- they would open the exam and find it half empty.
+    Candidates who are mid-paper keep their order untouched; changing the exam
+    under someone already sitting it is worse than a stale one.
+    """
+    stale = (
+        db.query(ExamCandidate)
+        .filter(
+            ExamCandidate.session_id == session.id,
+            ExamCandidate.started_at.is_(None),
+        )
+        .all()
+    )
+    for candidate in stale:
+        candidate.question_order = candidate_order(db, session)
+    return len(stale)
+
+
 def create_candidates(
     db: Session, session: ExamSession, entries: list[dict]
 ) -> list[ExamCandidate]:
@@ -122,9 +201,8 @@ def create_candidates(
     pattern. Their own identifier goes in `school_reference` instead, purely so
     results can be matched back to a class list.
 
-    Question order is shuffled per candidate. Same paper, different sequence,
-    which makes reading off the next screen along much harder without needing
-    any invigilation software.
+    Question order is shuffled per candidate, but only within each subject --
+    see `candidate_order`. Same paper, different sequence, same structure.
     """
     used_codes = {
         c.access_code for c in
@@ -139,16 +217,13 @@ def create_candidates(
                 break
         used_codes.add(code)
 
-        order = list(session.question_ids or [])
-        random.shuffle(order)
-
         candidate = ExamCandidate(
             session_id=session.id,
             registration_number=issue_registration_number(db),
             access_code=code,
             full_name=(entry.get("full_name") or "").strip() or None,
             school_reference=(entry.get("school_reference") or "").strip() or None,
-            question_order=order,
+            question_order=candidate_order(db, session),
         )
         db.add(candidate)
         made.append(candidate)
