@@ -25,12 +25,14 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.gamification import events
 from app import bots
+from app import matchmaking
 from app import rating_service
 from app.models import Battle, BattleParticipant, Question, SubjectRating, User
 from app.rate_limit import limiter
 from app.schemas import (
     BattleCreateIn, BattleOut, BattleQuestionOut, BattleResultOut,
     BattleSubmitIn, BattleSideOut, BattleLiveOut, BattleLiveAnswerIn,
+    RecentOpponentOut,
 )
 from app.subjects import SUBJECTS
 
@@ -133,6 +135,71 @@ def create_battle(
 def list_bots(user: User = Depends(get_current_user)):
     """The practice opponents, with their honest ratings."""
     return [bots.public(b) for b in bots.BOTS]
+
+
+@router.get("/recent-opponents", response_model=list[RecentOpponentOut])
+def get_recent_opponents(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """
+    Students this one has already battled, for a one-tap rematch.
+
+    The safe half of a friends list: no search, no requests, and therefore no
+    way for anyone to reach a specific child who did not already agree to play
+    them. See app/matchmaking.py.
+    """
+    return [RecentOpponentOut(**row) for row in matchmaking.recent_opponents(db, user.id)]
+
+
+@router.post("/find", response_model=BattleOut)
+@limiter.limit("30/hour")
+def find_opponent(
+    request: Request,
+    payload: BattleCreateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Play someone at your level, right now.
+
+    This is what removes the need for a social graph. A student with nobody
+    they know on Acelume presses one button and is playing within seconds --
+    which is the whole reason chess.com works for a beginner who joined alone.
+
+    Order of preference:
+      1. Join a fresh open challenge from a student of comparable rating.
+      2. Failing that, play a calibrated bot.
+
+    It never creates an open challenge and leaves the student waiting. A
+    matchmaking button that produces a spinner is worse than no button, and a
+    bot at their level is a better session than an empty queue.
+    """
+    if payload.subject not in SUBJECTS:
+        raise HTTPException(status_code=404, detail="Unknown subject.")
+    if payload.questions not in QUESTION_CHOICES:
+        raise HTTPException(status_code=400, detail="Choose 5 or 10 questions.")
+    if payload.mode not in ("async", "live"):
+        raise HTTPException(status_code=400, detail="Unknown battle mode.")
+
+    match = matchmaking.find_open_battle(
+        db, user, payload.subject, payload.questions, payload.mode
+    )
+    if match is not None:
+        db.add(BattleParticipant(battle_id=match.id, user_id=user.id))
+        if match.mode == "live" and match.started_at is None:
+            match.started_at = datetime.utcnow()
+        db.commit()
+        db.refresh(match)
+        return _battle_out(db, match, user)
+
+    # Nobody comparable is waiting. Give them a bot rather than a queue.
+    return create_battle(
+        request=request,
+        payload=BattleCreateIn(
+            subject=payload.subject, topic=payload.topic,
+            questions=payload.questions, mode=payload.mode, vs_bot=True,
+        ),
+        db=db,
+        user=user,
+    )
 
 
 def _bot_side(battle: Battle, db: Session) -> BattleSideOut | None:

@@ -726,3 +726,18 @@ export interface Analytics {
   funnel: AnalyticsFunnel;
   daily: { date: string; signups: number; activated: number }[];
 }
+
+/**
+ * Someone this student has already battled.
+ *
+ * Deliberately thin — a username and when. There is no search endpoint and no
+ * friend request anywhere in the app, so this list is the only social graph
+ * that exists, and every entry got there because both students agreed to play.
+ */
+export interface RecentOpponent {
+  user_id: number;
+  username: string;
+  subject: string;
+  last_played: string | null;
+  played: number;
+}

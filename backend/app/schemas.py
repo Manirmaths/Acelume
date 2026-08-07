@@ -922,6 +922,21 @@ class BattleCreateIn(BaseModel):
     vs_bot: bool = False
 
 
+class RecentOpponentOut(BaseModel):
+    """
+    Someone this student has already played.
+
+    Deliberately thin: a username, the subject and when. No profile, no
+    rating, no way to reach them outside a battle -- see app/matchmaking.py
+    for why this is the only shape of social graph the app offers.
+    """
+    user_id: int
+    username: str
+    subject: str
+    last_played: Optional[str] = None
+    played: int = 1
+
+
 class BattleAnswerIn(BaseModel):
     selected: Optional[str] = None
     seconds: Optional[int] = None

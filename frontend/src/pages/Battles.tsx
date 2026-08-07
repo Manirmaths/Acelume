@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api, ApiError } from '../api/client';
-import type { Battle as BattleType, BattleQuestion, BattleResult, Subject } from '../api/types';
+import type { Battle as BattleType, BattleQuestion, BattleResult, Subject, RecentOpponent } from '../api/types';
+import ShareChallenge from '../components/ShareChallenge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Spinner from '../components/ui/Spinner';
@@ -29,6 +30,12 @@ function Lobby() {
     queryFn: () => api.get<Subject[]>('/api/subjects'),
   });
 
+  const { data: recent } = useQuery({
+    queryKey: ['recent-opponents'],
+    queryFn: () => api.get<RecentOpponent[]>('/api/battles/recent-opponents'),
+    retry: false,
+  });
+
   const create = async (vsBot = false) => {
     setBusy(true);
     setError(null);
@@ -39,6 +46,36 @@ function Lobby() {
       navigate(`/battles/${b.code}`);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not start a challenge.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const findOpponent = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const b = await api.post<BattleType>('/api/battles/find', {
+        subject, questions: count, mode,
+      });
+      navigate(`/battles/${b.code}`);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not find an opponent.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rematch = async (opponentSubject: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const b = await api.post<BattleType>('/api/battles', {
+        subject: opponentSubject, questions: count, mode,
+      });
+      navigate(`/battles/${b.code}`);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not start a rematch.');
     } finally {
       setBusy(false);
     }
@@ -111,20 +148,51 @@ function Lobby() {
           <Button onClick={() => create(false)} disabled={busy}>
             {busy ? 'Creating…' : 'Challenge a friend'}
           </Button>
-          {/* Solves the 10pm-with-nobody-online case. A challenge that only
-              works when your friends are awake is a feature that mostly does
-              not exist. The opponent is always labelled a practice opponent —
-              see backend/app/bots.py for why that is non-negotiable. */}
-          <Button variant="outline" onClick={() => create(true)} disabled={busy}>
-            <i className="fa-solid fa-robot mr-2" aria-hidden="true" />
+          {/* Matchmaking, not a bot button. The server pairs you with a real
+              student of comparable rating when one is waiting, and falls back
+              to a practice bot only so that nobody is ever left staring at a
+              queue. See backend/app/matchmaking.py. */}
+          <Button variant="outline" onClick={findOpponent} disabled={busy}>
+            <i className="fa-solid fa-bolt mr-2" aria-hidden="true" />
             Play now
           </Button>
         </div>
         <p className="text-xs text-ink-400 mt-2">
-          No one around? "Play now" matches you with a practice opponent at your level.
-          Those results do not count towards the league.
+          "Play now" finds someone at your level straight away. If nobody is around you
+          get a practice opponent instead — those results never count towards the league.
         </p>
       </Card>
+
+      {recent && recent.length > 0 && (
+        <Card padding="lg" className="mb-4">
+          <h2 className="font-display font-bold text-sm text-ink-900 mb-1">Play again</h2>
+          {/* The safe half of a friends list: everyone here is someone this
+              student already agreed to battle. No search, no requests, so no
+              way to reach a specific child who did not opt in. */}
+          <p className="text-xs text-ink-400 mb-3">People you have played before.</p>
+          <div className="space-y-1.5">
+            {recent.map((r) => (
+              <button
+                key={r.user_id}
+                onClick={() => rematch(r.subject)}
+                disabled={busy}
+                className="w-full flex items-center gap-3 rounded-xl border border-ink-200 px-3.5 py-2.5 text-left hover:border-brand-300 hover:bg-brand-50/50 disabled:opacity-50"
+              >
+                <span className="w-8 h-8 rounded-full bg-ink-100 text-ink-500 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  {r.username.slice(0, 2).toUpperCase()}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-semibold text-ink-900 truncate">{r.username}</span>
+                  <span className="block text-xs text-ink-400">
+                    {r.subject} · played {r.played} time{r.played === 1 ? '' : 's'}
+                  </span>
+                </span>
+                <span className="text-xs font-semibold text-brand-600 flex-shrink-0">Rematch</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card padding="lg">
         <h2 className="font-display font-bold text-sm text-ink-900 mb-3">Join with a code</h2>
@@ -322,11 +390,11 @@ function Result({ code }: { code: string }) {
 
       {data.outcome === 'waiting' && !data.vs_bot && (
         <Card padding="md" className="mb-6 bg-info-50 border-info-100">
-          <p className="text-sm text-info-700">
+          <p className="text-sm text-info-700 mb-3">
             <i className="fa-solid fa-share-nodes mr-1.5" aria-hidden="true" />
-            Share the code <span className="font-mono font-bold">{data.code}</span> so they can
-            play. This updates on its own when they finish.
+            Send this to your friend. The result updates on its own once they finish.
           </p>
+          <ShareChallenge code={data.code} subject={data.subject} />
         </Card>
       )}
 
