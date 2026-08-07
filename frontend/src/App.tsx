@@ -31,6 +31,7 @@ const Results = lazy(() => import('./pages/Results'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Leaderboard = lazy(() => import('./pages/Leaderboard'));
 const Blitz = lazy(() => import('./pages/Blitz'));
+const Rush = lazy(() => import('./pages/Rush'));
 const Mock = lazy(() => import('./pages/Mock'));
 const MockExam = lazy(() => import('./pages/MockExam'));
 const PaymentCallback = lazy(() => import('./pages/PaymentCallback'));
@@ -95,6 +96,7 @@ export default function App() {
           <Route path="/battles" element={<Battles />} />
           <Route path="/battles/:code" element={<Battles />} />
           <Route path="/blitz" element={<Blitz />} />
+          <Route path="/rush" element={<Rush />} />
           <Route path="/mock" element={<Mock />} />
           <Route path="/mock-attempt/:attemptId" element={<MockExam />} />
           <Route path="/payment-callback" element={<PaymentCallback />} />

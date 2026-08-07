@@ -29,11 +29,13 @@ function Lobby() {
     queryFn: () => api.get<Subject[]>('/api/subjects'),
   });
 
-  const create = async () => {
+  const create = async (vsBot = false) => {
     setBusy(true);
     setError(null);
     try {
-      const b = await api.post<BattleType>('/api/battles', { subject, questions: count, mode });
+      const b = await api.post<BattleType>('/api/battles', {
+        subject, questions: count, mode, vs_bot: vsBot,
+      });
       navigate(`/battles/${b.code}`);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not start a challenge.');
@@ -105,9 +107,23 @@ function Lobby() {
             ? 'Both of you answer the same question at the same time, 30 seconds each. Starts as soon as they join.'
             : 'You each answer in your own time. The result settles once you have both finished.'}
         </p>
-        <Button onClick={create} disabled={busy}>
-          {busy ? 'Creating…' : 'Create challenge'}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => create(false)} disabled={busy}>
+            {busy ? 'Creating…' : 'Challenge a friend'}
+          </Button>
+          {/* Solves the 10pm-with-nobody-online case. A challenge that only
+              works when your friends are awake is a feature that mostly does
+              not exist. The opponent is always labelled a practice opponent —
+              see backend/app/bots.py for why that is non-negotiable. */}
+          <Button variant="outline" onClick={() => create(true)} disabled={busy}>
+            <i className="fa-solid fa-robot mr-2" aria-hidden="true" />
+            Play now
+          </Button>
+        </div>
+        <p className="text-xs text-ink-400 mt-2">
+          No one around? "Play now" matches you with a practice opponent at your level.
+          Those results do not count towards the league.
+        </p>
       </Card>
 
       <Card padding="lg">
@@ -254,9 +270,10 @@ function Result({ code }: { code: string }) {
 
   if (isLoading || !data) return <Spinner className="w-8 h-8 mt-16" />;
 
+  const opponentNoun = data.opponent?.is_bot ? data.opponent.username : 'Your opponent';
   const headline =
     data.outcome === 'won' ? 'You won' :
-    data.outcome === 'lost' ? 'Your opponent won' :
+    data.outcome === 'lost' ? `${opponentNoun} won` :
     data.outcome === 'draw' ? 'A draw' : 'Waiting for your opponent';
 
   return (
@@ -268,7 +285,20 @@ function Result({ code }: { code: string }) {
         <div className="grid grid-cols-2 gap-4 text-center">
           {[data.you, data.opponent].map((side, i) => (
             <div key={i}>
-              <p className="text-xs font-semibold text-ink-400 mb-1">{i === 0 ? 'You' : 'Opponent'}</p>
+              {/* A bot is always visibly a bot, and is called a practice
+                  opponent rather than an opponent. Never inferable-only. */}
+              <p className="text-xs font-semibold text-ink-400 mb-1">
+                {i === 0
+                  ? 'You'
+                  : side?.is_bot
+                    ? (
+                      <>
+                        <i className="fa-solid fa-robot mr-1" aria-hidden="true" />
+                        {side.username} · practice opponent
+                      </>
+                    )
+                    : 'Opponent'}
+              </p>
               <p className="font-display font-extrabold text-2xl text-ink-900">
                 {side ? side.score : '—'}
               </p>
@@ -284,7 +314,13 @@ function Result({ code }: { code: string }) {
         </div>
       </Card>
 
-      {data.outcome === 'waiting' && (
+      {data.vs_bot && (
+        <p className="text-xs text-ink-400 mb-6 text-center">
+          {data.opponent?.bot_blurb} Practice results do not count towards the league.
+        </p>
+      )}
+
+      {data.outcome === 'waiting' && !data.vs_bot && (
         <Card padding="md" className="mb-6 bg-info-50 border-info-100">
           <p className="text-sm text-info-700">
             <i className="fa-solid fa-share-nodes mr-1.5" aria-hidden="true" />

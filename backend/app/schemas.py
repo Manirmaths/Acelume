@@ -122,6 +122,16 @@ class BlitzStartIn(BaseModel):
     difficulty: Optional[str] = None  # easy | medium | hard
 
 
+class RushStateOut(BaseModel):
+    """Live state of a Rush run -- score, strikes and the bar to beat."""
+    attempt_id: int
+    score: int
+    strikes: int
+    strikes_allowed: int
+    finished: bool
+    personal_best: int = 0
+
+
 class MockStartIn(BaseModel):
     subjects: list[str]  # exactly 3 candidate-chosen subjects, sat alongside compulsory English
 
@@ -247,6 +257,12 @@ class ResultItem(BaseModel):
     is_correct: bool
     is_marked: bool
     explanation: Optional[str] = None
+    # Named mistake type: sharp | solid | lucky | slip | gap | blunder.
+    # Null for an unanswered question -- see app/answer_labels.py.
+    label: Optional[str] = None
+    label_title: Optional[str] = None
+    label_message: Optional[str] = None
+    label_tone: Optional[str] = None
 
 
 class PersonalBestOut(BaseModel):
@@ -262,11 +278,47 @@ class PersonalBestOut(BaseModel):
     message: str
 
 
+class AnswerQualityOut(BaseModel):
+    """Chess.com-style review of a finished attempt."""
+    # Weighted, so a lucky guess does not read the same as a clean answer.
+    # Deliberately not equal to percent correct.
+    accuracy: Optional[int] = None
+    counts: dict[str, int] = {}
+    # The single most actionable sentence about this attempt.
+    headline: Optional[str] = None
+    # Topics to send them to, drawn from slips first -- a lapse on known
+    # material is the cheapest thing to fix.
+    focus_topics: list[str] = []
+
+
 class ResultsOut(BaseModel):
     score: int
     total: int
     items: list[ResultItem]
     personal_best: Optional[PersonalBestOut] = None
+    quality: Optional[AnswerQualityOut] = None
+    # So the results screen can link straight into more practice on a focus
+    # topic without a second round-trip to work out which subject it was.
+    subject: Optional[str] = None
+
+
+class SubjectRatingOut(BaseModel):
+    """
+    A subject rating, as the student is allowed to see it.
+
+    Note what is absent: the raw Glicko number. It stays internal on purpose.
+    "I'm a 900 and my friend is a 1400" is the failure mode the predicted-score
+    framing exists to avoid.
+    """
+    subject: str
+    predicted_score: int
+    range_low: int
+    range_high: int
+    provisional: bool
+    answers_counted: int
+    # Only ever rendered when positive. A fall is never announced on its own --
+    # it must arrive attached to an action.
+    week_delta: Optional[int] = None
 
 
 # ---------- Dashboard ----------
@@ -771,6 +823,9 @@ class BattleCreateIn(BaseModel):
     topic: Optional[str] = None
     questions: int = 5  # 5 or 10
     mode: str = "async"  # async | live
+    # Play a calibrated practice opponent instead of waiting for a human.
+    # Solves the 10pm-with-no-friends-online case; see app/bots.py.
+    vs_bot: bool = False
 
 
 class BattleAnswerIn(BaseModel):
@@ -809,6 +864,7 @@ class BattleOut(BaseModel):
     you_submitted: bool
     mode: str = "async"
     started_at: Optional[str] = None
+    vs_bot: bool = False
 
 
 class BattleSideOut(BaseModel):
@@ -817,6 +873,10 @@ class BattleSideOut(BaseModel):
     attempted: int
     submitted: bool
     avg_correct_seconds: Optional[int] = None
+    # Always sent, never inferred from the name. Every surface that renders an
+    # opponent must be able to say plainly that this one is not a person.
+    is_bot: bool = False
+    bot_blurb: Optional[str] = None
 
 
 class BattleResultOut(BaseModel):
@@ -830,6 +890,9 @@ class BattleResultOut(BaseModel):
     you: BattleSideOut
     opponent: Optional[BattleSideOut] = None
     review: list[dict] = []
+    # True when the opponent was a practice bot. Such a result never counts
+    # toward league points or leaderboards -- see routers/battles.py.
+    vs_bot: bool = False
 
 
 class BattleLiveOut(BaseModel):

@@ -47,7 +47,7 @@ const NAV_ITEMS: NavItem[] = [
     to: '/practice',
     labelKey: 'nav.practice',
     icon: 'fa-solid fa-pen-to-square',
-    owns: ['/quiz', '/quiz-attempt', '/mock', '/mock-attempt', '/blitz', '/battles', '/review', '/flashcards', '/results'],
+    owns: ['/quiz', '/quiz-attempt', '/mock', '/mock-attempt', '/blitz', '/rush', '/battles', '/review', '/flashcards', '/results'],
   },
   {
     to: '/progress',

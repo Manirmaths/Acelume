@@ -2,18 +2,22 @@ import random
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.database import get_db
 from app.gamification import config, events, missions, personal_best
+from app import answer_labels
+from app import rating as glicko
+from app import rating_service
 from app.models import (
     Question, QuizAttempt, UserResponse, ReviewQuestion, User, QuestionMastery,
-    PersonalBest,
+    PersonalBest, SubjectRating, TopicMastery,
 )
 from app.schemas import (
     QuizStartIn, QuizAttemptOut, QuestionPublic, AnswerIn, AnswerOut, ResultsOut, ResultItem,
-    PersonalBestOut,
+    PersonalBestOut, AnswerQualityOut,
 )
 from app.subjects import SUBJECTS
 
@@ -35,12 +39,55 @@ RECENT_EXCLUDE_LIMIT = 50
 # itself signal, and dropping the row would lose the answer too.
 MAX_ANSWER_SECONDS = 600
 
+# Rush mode: wrong answers that end a run. Defined here rather than in
+# routers/rush.py because the shared answer endpoint below enforces it, and
+# importing rush from quiz would be circular (rush imports quiz helpers).
+RUSH_MAX_STRIKES = 3
+
 
 def clamp_answer_seconds(value: int | None) -> int | None:
     """Bound client-reported timing. None in, None out -- never fabricate."""
     if value is None:
         return None
     return max(0, min(int(value), MAX_ANSWER_SECONDS))
+
+
+def _apply_rating(db: Session, user: User, attempt: QuizAttempt) -> None:
+    """
+    Update the student's subject rating from a finished attempt.
+
+    Once per attempt, not once per answer: Glicko-2 is defined over a rating
+    period containing several results, and a per-answer update overreacts to
+    each one and makes the number visibly jitter.
+
+    Silent no-op for unrated modes -- see rating_service.RATED_MODES for why
+    review and diagnostic sessions are excluded.
+    """
+    if attempt.mode not in rating_service.RATED_MODES or not attempt.subject:
+        return
+
+    responses = {
+        r.question_id: r
+        for r in db.query(UserResponse).filter(UserResponse.attempt_id == attempt.id).all()
+    }
+
+    outcomes = []
+    for qid in attempt.question_ids:
+        r = responses.get(qid)
+        if r is None:
+            # Skipped or timed out. Not attempted, so not evidence either way.
+            continue
+        question = db.get(Question, qid)
+        if question is None:
+            continue
+        q_rating, q_dev = rating_service.question_rating_for(db, question)
+        outcomes.append(glicko.Outcome(
+            question_rating=q_rating,
+            question_deviation=q_dev,
+            score=1.0 if r.is_correct else 0.0,
+        ))
+
+    rating_service.apply_attempt(db, user, attempt.subject, outcomes, attempt.mode)
 
 # Modes whose results are allowed to advance topic mastery. A diagnostic
 # deliberately samples every subject shallowly, and "marked" replays questions
@@ -161,6 +208,45 @@ def _pick_pool(db: Session, user_id: int, subject: str | None, topic: str | None
     return pool, build
 
 
+def pick_at_level(
+    db: Session, user_id: int, subject: str | None, pool: list[Question], n: int
+) -> list[Question]:
+    """
+    Choose n questions from `pool`, biased to just above the student's level.
+
+    Serving questions at random means a strong student wastes most of a session
+    on things they already know and a weak one is repeatedly beaten by things
+    they cannot yet do. Neither is where learning happens; +50 to +150 rating
+    points above the student is -- likely to succeed, not certain to.
+
+    Falls back to a plain random sample whenever the rating is missing or still
+    provisional. Adaptive selection driven by a number the app does not yet
+    trust is worse than no adaptation at all.
+    """
+    if len(pool) <= n:
+        return list(pool)
+
+    band = rating_service.target_difficulty_band(db, user_id, subject) if subject else None
+    if band is None:
+        return random.sample(pool, n)
+
+    low, high = band
+    target = (low + high) / 2.0
+
+    scored = []
+    for q in pool:
+        q_rating, _ = rating_service.question_rating_for(db, q)
+        # Distance from the target band, with a little noise so two identical
+        # sessions are not the same questions in the same order.
+        distance = abs(q_rating - target) + random.uniform(0, 60)
+        scored.append((distance, q))
+
+    scored.sort(key=lambda pair: pair[0])
+    chosen = [q for _, q in scored[:n]]
+    random.shuffle(chosen)
+    return chosen
+
+
 def _question_public(q: Question) -> QuestionPublic:
     from app.schemas import PassageOut
     return QuestionPublic(
@@ -209,7 +295,14 @@ def start_quiz(payload: QuizStartIn, db: Session = Depends(get_db), user: User =
             label += f" for {payload.year}"
         raise HTTPException(status_code=400, detail=f"Not enough questions in {label} for your selection.")
 
-    selected = random.sample(pool, n)
+    # Adaptive when the student's rating is settled, plain random otherwise.
+    # An explicit difficulty filter is the student overriding this on purpose,
+    # so it wins.
+    if payload.difficulty is None:
+        selected = pick_at_level(db, user.id, payload.subject, pool, n)
+    else:
+        selected = random.sample(pool, n)
+
     per_q = None
     if payload.per_q:
         per_q = max(15, min(payload.per_q, 180))
@@ -344,12 +437,31 @@ def answer_quiz(attempt_id: int, payload: AnswerIn, db: Session = Depends(get_db
             )
             missions.advance(db, user, kind=missions.IMPROVEMENT)
 
+    # A question's own difficulty rating is self-calibrating from real
+    # performance, and is updated for EVERY answer regardless of mode -- unlike
+    # a student's rating, it is not distorted by which mode served it.
+    rating_service.record_question_result(db, question.id, is_correct)
+
     attempt.current_index += 1
+
+    # Rush: three wrong answers ends the run, wherever it has got to. Handled
+    # here rather than in routers/rush.py because every mode shares this single
+    # answer endpoint, and a second one would be a second place for the
+    # scoring rules to drift.
+    if attempt.mode == "rush" and not is_correct:
+        attempt.strikes = (attempt.strikes or 0) + 1
+        if attempt.strikes >= RUSH_MAX_STRIKES:
+            # Jump the index to the end so the shared "is it finished?" logic
+            # below runs exactly as it would on a completed attempt -- personal
+            # best, rating and mastery all get recorded normally.
+            attempt.current_index = len(attempt.question_ids)
+
     if attempt.current_index >= len(attempt.question_ids):
         attempt.finished_at = datetime.utcnow()
         if attempt.mode == "diagnostic":
             user.has_taken_diagnostic = True
         _record_topic_progress(db, user, attempt)
+        _apply_rating(db, user, attempt)
 
         # Mastery streak: a session of real length answered accurately. The
         # Learning streak (record_practice, above) already counted the day for
@@ -447,6 +559,10 @@ def finish_quiz(attempt_id: int, db: Session = Depends(get_db), user: User = Dep
         attempt.finished_at = datetime.utcnow()
         if attempt.mode == "diagnostic":
             user.has_taken_diagnostic = True
+        # A timed-out attempt is still evidence: the questions they DID answer
+        # were answered under real conditions. Only the unanswered ones are
+        # skipped (see _apply_rating), so running out of time costs nothing.
+        _apply_rating(db, user, attempt)
         db.commit()
         db.refresh(attempt)
 
@@ -475,8 +591,31 @@ def quiz_results(attempt_id: int, db: Session = Depends(get_db), user: User = De
         rq.question_id for rq in db.query(ReviewQuestion).filter(ReviewQuestion.user_id == user.id).all()
     }
 
+    # Context for the answer-quality labels. Gathered once for the whole
+    # attempt rather than per question, since every item needs the same three
+    # things: how good the student is, how long they usually take, and which
+    # topics they have already learned.
+    student_ratings: dict[str, float] = {
+        r.subject: r.rating
+        for r in db.query(SubjectRating).filter(SubjectRating.user_id == user.id).all()
+    }
+    average_seconds = (
+        db.query(func.avg(UserResponse.answer_seconds))
+        .filter(UserResponse.user_id == user.id, UserResponse.answer_seconds.isnot(None))
+        .scalar()
+    )
+    topic_states: dict[tuple[str, str], str] = {
+        (tm.subject, tm.topic): tm.state
+        for tm in db.query(TopicMastery).filter(TopicMastery.user_id == user.id).all()
+    }
+
     items = []
     correct_count = 0
+    label_counts: dict[str, int] = {}
+    answered_count = 0
+    slip_topics: list[str] = []
+    gap_topics: list[str] = []
+
     for qid in attempt.question_ids:
         q = db.get(Question, qid)
         if not q:
@@ -485,6 +624,25 @@ def quiz_results(attempt_id: int, db: Session = Depends(get_db), user: User = De
         is_correct = bool(r and r.is_correct)
         if is_correct:
             correct_count += 1
+
+        q_rating, _ = rating_service.question_rating_for(db, q)
+        label = answer_labels.classify(
+            is_correct=is_correct,
+            answered=r is not None,
+            question_rating=q_rating,
+            student_rating=student_ratings.get(q.subject) if q.subject else None,
+            topic_state=topic_states.get((q.subject, q.topic)) if q.subject else None,
+            answer_seconds=r.answer_seconds if r else None,
+            average_seconds=float(average_seconds) if average_seconds else None,
+        )
+        if label is not None:
+            answered_count += 1
+            label_counts[label.key] = label_counts.get(label.key, 0) + 1
+            if label.key == "slip" and q.topic not in slip_topics:
+                slip_topics.append(q.topic)
+            elif label.key == "gap" and q.topic not in gap_topics:
+                gap_topics.append(q.topic)
+
         items.append(ResultItem(
             question_id=q.id,
             question_text=q.question_text,
@@ -494,7 +652,20 @@ def quiz_results(attempt_id: int, db: Session = Depends(get_db), user: User = De
             is_correct=is_correct,
             is_marked=q.id in marked_ids,
             explanation=q.explanation,
+            label=label.key if label else None,
+            label_title=label.title if label else None,
+            label_message=label.message if label else None,
+            label_tone=label.tone if label else None,
         ))
+
+    quality = AnswerQualityOut(
+        accuracy=answer_labels.accuracy(label_counts, answered_count),
+        counts=label_counts,
+        headline=answer_labels.headline(label_counts),
+        # Slips first: a lapse on material the student has already mastered is
+        # the cheapest possible thing for them to fix.
+        focus_topics=(slip_topics + gap_topics)[:3],
+    )
 
     # Read the stored personal best rather than recomputing: recording happens
     # once when the attempt finishes, so re-opening results can never
@@ -544,7 +715,10 @@ def quiz_results(attempt_id: int, db: Session = Depends(get_db), user: User = De
             message=personal_best.message_for(result, weakest),
         )
 
-    return ResultsOut(score=correct_count, total=len(items), items=items, personal_best=pb_out)
+    return ResultsOut(
+        score=correct_count, total=len(items), items=items,
+        personal_best=pb_out, quality=quality, subject=attempt.subject,
+    )
 
 
 @router.post("/{attempt_id}/retake-wrong", response_model=QuizAttemptOut)

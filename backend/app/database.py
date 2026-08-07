@@ -77,6 +77,9 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str]]] = {
     "battle": [
         ("mode", "VARCHAR(10) NOT NULL DEFAULT 'async'"),
         ("started_at", "TIMESTAMP"),
+        # Practice-bot opponent, so a battle is playable when nobody else is
+        # online. Nullable: every existing battle was against a human.
+        ("bot_key", "VARCHAR(20)"),
     ],
     "battle_participant": [
         ("last_seen_at", "TIMESTAMP"),
@@ -95,6 +98,9 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str]]] = {
         # is the one default clause that's valid on both SQLite and Postgres
         # without dialect-specific casting syntax.
         ("marked_question_ids", "TEXT NOT NULL DEFAULT '[]'"),
+        # Rush mode: wrong answers so far. Defaults to 0, which is correct for
+        # every pre-existing attempt since none of them were Rush runs.
+        ("strikes", "INTEGER NOT NULL DEFAULT 0"),
     ],
 }
 

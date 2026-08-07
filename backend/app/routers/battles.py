@@ -24,7 +24,9 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.gamification import events
-from app.models import Battle, BattleParticipant, Question, User
+from app import bots
+from app import rating_service
+from app.models import Battle, BattleParticipant, Question, SubjectRating, User
 from app.rate_limit import limiter
 from app.schemas import (
     BattleCreateIn, BattleOut, BattleQuestionOut, BattleResultOut,
@@ -91,6 +93,18 @@ def create_battle(
         raise HTTPException(status_code=400, detail="Not enough questions for a battle here yet.")
 
     selected = random.sample(pool, payload.questions)
+
+    # A bot battle is playable immediately and never waits for anyone, so it
+    # skips the "open" invitation state entirely.
+    bot = None
+    if payload.vs_bot:
+        rating_row = (
+            db.query(SubjectRating)
+            .filter(SubjectRating.user_id == user.id, SubjectRating.subject == payload.subject)
+            .first()
+        )
+        bot = bots.pick_for(rating_row.rating if rating_row else None)
+
     battle = Battle(
         code=_code(),
         created_by=user.id,
@@ -102,13 +116,67 @@ def create_battle(
         seconds_per_question=30,
         mode=payload.mode,
         expires_at=datetime.utcnow() + timedelta(hours=INVITE_TTL_HOURS),
+        bot_key=bot.key if bot else None,
     )
+    if bot is not None and payload.mode == "live":
+        # No second player will ever arrive, so the shared clock starts now.
+        battle.started_at = datetime.utcnow()
     db.add(battle)
     db.flush()
     db.add(BattleParticipant(battle_id=battle.id, user_id=user.id))
     db.commit()
     db.refresh(battle)
     return _battle_out(db, battle, user)
+
+
+@router.get("/bots")
+def list_bots(user: User = Depends(get_current_user)):
+    """The practice opponents, with their honest ratings."""
+    return [bots.public(b) for b in bots.BOTS]
+
+
+def _bot_side(battle: Battle, db: Session) -> BattleSideOut | None:
+    """
+    Simulate the bot's performance for this battle.
+
+    Deterministic: the RNG is seeded from the battle id, so grading is
+    idempotent. This endpoint can be called repeatedly and either player may
+    trigger a finish, and a bot whose score changed between two reads of the
+    same battle would look exactly like cheating.
+    """
+    if not battle.bot_key:
+        return None
+    bot = bots.BOTS_BY_KEY.get(battle.bot_key)
+    if bot is None:
+        return None
+
+    rng = random.Random(f"battle:{battle.id}:{battle.bot_key}")
+    correct = 0
+    attempted = 0
+    correct_seconds = 0
+
+    for qid in battle.question_ids:
+        q = db.get(Question, qid)
+        if q is None:
+            continue
+        q_rating, _ = rating_service.question_rating_for(db, q)
+        chosen, seconds = bots.answer(
+            bot, q_rating, q.correct_option, ["A", "B", "C", "D"], rng
+        )
+        attempted += 1
+        if chosen == q.correct_option:
+            correct += 1
+            correct_seconds += min(seconds, battle.seconds_per_question)
+
+    return BattleSideOut(
+        username=bot.name,
+        score=correct,
+        attempted=attempted,
+        submitted=True,
+        avg_correct_seconds=round(correct_seconds / correct) if correct else None,
+        is_bot=True,
+        bot_blurb=bot.blurb,
+    )
 
 
 @router.post("/{code}/join", response_model=BattleOut)
@@ -194,14 +262,16 @@ def submit_battle(
         .filter(BattleParticipant.battle_id == battle.id, BattleParticipant.user_id != user.id)
         .all()
     )
-    if others and all(o.submitted_at is not None for o in others):
+    # A bot is always ready, so the student submitting is the only thing that
+    # can complete the battle.
+    if battle.bot_key or (others and all(o.submitted_at is not None for o in others)):
         battle.status = "complete"
 
     events.record(
         db, user=user, event_type=events.BATTLE_COMPLETED,
         event_key=f"{events.BATTLE_COMPLETED}:battle={battle.id}:user={user.id}",
         subject=battle.subject, topic=battle.topic, source_id=str(battle.id),
-        payload={"score": correct, "total": len(battle.question_ids)},
+        payload={"score": correct, "total": len(battle.question_ids), "vs_bot": bool(battle.bot_key)},
         award_xp=False,  # battle XP is deliberately not awarded twice over practice
     )
     db.commit()
@@ -385,14 +455,17 @@ def live_finish(code: str, db: Session = Depends(get_db), user: User = Depends(g
             if o.submitted_at is None:
                 _grade_live(db, battle, o)
 
-    if others and all(o.submitted_at is not None for o in others):
+    if battle.bot_key or (others and all(o.submitted_at is not None for o in others)):
         battle.status = "complete"
 
     events.record(
         db, user=user, event_type=events.BATTLE_COMPLETED,
         event_key=f"{events.BATTLE_COMPLETED}:battle={battle.id}:user={user.id}",
         subject=battle.subject, topic=battle.topic, source_id=str(battle.id),
-        payload={"score": me.score, "total": len(battle.question_ids), "mode": "live"},
+        payload={
+            "score": me.score, "total": len(battle.question_ids), "mode": "live",
+            "vs_bot": bool(battle.bot_key),
+        },
         award_xp=False,
     )
     db.commit()
@@ -454,10 +527,13 @@ def _battle_out(db: Session, battle: Battle, user: User) -> BattleOut:
         seconds_per_question=battle.seconds_per_question,
         status=battle.status,
         expires_at=battle.expires_at.isoformat(),
-        players=len(participants),
+        # The bot counts as a player for display, so the UI does not tell a
+        # student they are "waiting for an opponent" who is already there.
+        players=len(participants) + (1 if battle.bot_key else 0),
         you_submitted=any(p.user_id == user.id and p.submitted_at for p in participants),
         mode=battle.mode,
         started_at=battle.started_at.isoformat() if battle.started_at else None,
+        vs_bot=bool(battle.bot_key),
     )
 
 
@@ -479,8 +555,17 @@ def _result_out(db: Session, battle: Battle, user: User) -> BattleResultOut:
     me = next(p for p in parts if p.user_id == user.id)
     them = next((p for p in parts if p.user_id != user.id), None)
 
+    # A practice bot is not a BattleParticipant row -- deliberately, so it can
+    # never be counted as a player, and can never accrue league points or a
+    # leaderboard position. It is materialised only here, at render time.
+    bot_side = _bot_side(battle, db) if battle.bot_key else None
+
     outcome = "waiting"
-    if them is not None and me.submitted_at and them.submitted_at:
+    if bot_side is not None:
+        # The bot is always ready, so the only thing gating a result is whether
+        # the student has finished.
+        outcome = _decide_against_bot(me, bot_side) if me.submitted_at else "waiting"
+    elif them is not None and me.submitted_at and them.submitted_at:
         outcome = _decide(me, them)
     elif me.submitted_at and them is None:
         outcome = "waiting"
@@ -507,9 +592,31 @@ def _result_out(db: Session, battle: Battle, user: User) -> BattleResultOut:
         mode=battle.mode,
         outcome=outcome,
         you=_side(db, me),
-        opponent=_side(db, them) if them else None,
+        opponent=bot_side or (_side(db, them) if them else None),
         review=review,
+        vs_bot=bot_side is not None,
     )
+
+
+def _decide_against_bot(me: BattleParticipant, bot: BattleSideOut) -> str:
+    """
+    Same tiebreak order as a human battle: correct, then attempted, then
+    faster on correct answers, then a draw.
+
+    Kept as a separate function rather than coercing the bot into a
+    BattleParticipant, because a fake participant row is exactly how a bot
+    ends up in a league table by accident six months from now.
+    """
+    if me.score != bot.score:
+        return "won" if me.score > bot.score else "lost"
+    if me.attempted != bot.attempted:
+        return "won" if me.attempted > bot.attempted else "lost"
+
+    mine = (me.correct_seconds / me.score) if me.score else None
+    theirs = bot.avg_correct_seconds
+    if mine is not None and theirs is not None and round(mine) != theirs:
+        return "won" if mine < theirs else "lost"
+    return "draw"
 
 
 def _decide(me: BattleParticipant, them: BattleParticipant) -> str:

@@ -41,6 +41,12 @@ export default function PracticeHub() {
       description: 'A complete timed UTME paper: English plus three subjects, 180 questions.',
     },
     {
+      to: '/rush',
+      icon: 'fa-solid fa-fire-flame-curved',
+      title: 'Rush',
+      description: 'Questions get harder as you go. Three wrong and the run ends.',
+    },
+    {
       to: '/blitz',
       icon: 'fa-solid fa-bolt',
       title: 'Blitz',
@@ -56,7 +62,7 @@ export default function PracticeHub() {
       to: '/battles',
       icon: 'fa-solid fa-people-arrows',
       title: 'Challenge a friend',
-      description: 'Head-to-head over the same questions. Play live or leave them a code.',
+      description: 'Head-to-head over the same questions. Play a friend, or a practice opponent right now.',
     },
   ];
 

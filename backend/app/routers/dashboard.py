@@ -9,8 +9,13 @@ from sqlalchemy import func
 
 from app.models import UserResponse, ReviewQuestion, Question, QuizAttempt, User, QuestionMastery
 from app.progress import compute_progress
+from app import rating_service
+from app.subjects import SUBJECTS
 from app.gamification import config
-from app.schemas import DashboardOut, DailyGoalIn, LevelOut, UnfinishedAttempt, UserOut, PracticeDay
+from app.schemas import (
+    DashboardOut, DailyGoalIn, LevelOut, UnfinishedAttempt, UserOut, PracticeDay,
+    SubjectRatingOut,
+)
 
 DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"]
 
@@ -19,6 +24,24 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 POINTS_PER_CORRECT = 10
 # Duolingo-style daily goal presets (in points, +10 per correct answer).
 DAILY_GOAL_PRESETS = [20, 50, 100, 150]
+
+
+@router.get("/ratings", response_model=list[SubjectRatingOut])
+def get_ratings(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """
+    Predicted exam score per subject, derived from the internal Glicko rating.
+
+    Only subjects with enough answers behind them appear at all -- a prediction
+    from four questions is a guess wearing a number's clothes, and
+    rating_service.summary_for enforces that rather than leaving it to the UI.
+    """
+    out = []
+    for subject in SUBJECTS:
+        summary = rating_service.summary_for(db, user.id, subject)
+        if summary:
+            out.append(SubjectRatingOut(**summary))
+    out.sort(key=lambda r: r.predicted_score, reverse=True)
+    return out
 
 
 @router.get("", response_model=DashboardOut)

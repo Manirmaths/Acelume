@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 UTC = _timezone.utc
 
-from sqlalchemy import String, Integer, Text, Boolean, DateTime, Date, ForeignKey, JSON, UniqueConstraint
+from sqlalchemy import String, Integer, Float, Text, Boolean, DateTime, Date, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -298,6 +298,16 @@ class QuizAttempt(Base):
     # the free-navigation Mock exam flow (routers/mock.py); quiz/blitz/
     # smart_review's linear one-question-at-a-time flow doesn't touch this.
     marked_question_ids: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+
+    # Rush mode only: wrong answers so far. The run ends at RUSH_MAX_STRIKES.
+    #
+    # A strike count and a timer produce opposite behaviour. A timer makes a
+    # student rush -- the whole session is spent trying to go faster. Three
+    # strikes makes them careful, then greedy as the score climbs, then careful
+    # again, and the run ends on a moment of tension rather than a beep. It is
+    # also what makes a personal best mean something: two Rush runs are
+    # directly comparable in a way two timed quizzes are not.
+    strikes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -921,6 +931,71 @@ class MasteryPointLedger(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class SubjectRating(Base):
+    """
+    A student's Glicko-2 rating in one subject.
+
+    The one number that can go DOWN and is comparable between people. See
+    app/rating.py for why this exists when XP, level, mastery and league tier
+    already do.
+
+    `path_id` is present but unused: learning paths (JAMB 2027, WAEC, a
+    university course) are the next architectural change, and mastery in one
+    must never blend into another. Adding the column now, nullable, means the
+    migration later is a backfill rather than an ALTER on a hot table. Until
+    then every rating hangs off the single implicit path.
+    """
+    __tablename__ = "subject_rating"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+    path_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    rating: Mapped[float] = mapped_column(Float, default=1200.0, nullable=False)
+    # RD -- uncertainty. High means "we do not know yet", and the UI must say
+    # so rather than showing a confident-looking number.
+    deviation: Mapped[float] = mapped_column(Float, default=350.0, nullable=False)
+    volatility: Mapped[float] = mapped_column(Float, default=0.06, nullable=False)
+
+    peak_rating: Mapped[float] = mapped_column(Float, default=1200.0, nullable=False)
+    # Snapshot taken at the start of the current week, so the UI can say
+    # "+4 this week" without storing a full history.
+    week_start_rating: Mapped[float] = mapped_column(Float, default=1200.0, nullable=False)
+    week_start_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    answers_counted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "path_id", "subject", name="uq_subject_rating_user_path_subject"),
+    )
+
+
+class QuestionRating(Base):
+    """
+    How hard a question actually is, measured rather than asserted.
+
+    `Question.difficulty` is a human tag and is frequently wrong -- a question
+    tagged easy that 5% of students get right is not easy. These counters are
+    the raw material for the real number (see
+    rating.question_rating_from_responses).
+
+    Stored as counters rather than recomputed from UserResponse on every read:
+    the aggregate query over a table that grows with every answer in the app
+    is exactly the sort of thing that is fine at 10k rows and a problem at 10m.
+    """
+    __tablename__ = "question_rating"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    question_id: Mapped[int] = mapped_column(
+        ForeignKey("question.id"), nullable=False, unique=True, index=True
+    )
+    times_seen: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    times_correct: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class DailyQuestion(Base):
     """
     One question per calendar day, THE SAME for every student.
@@ -1010,6 +1085,14 @@ class Battle(Base):
     status: Mapped[str] = mapped_column(String(20), default="open", nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Set when the opponent is a calibrated practice bot rather than a person
+    # (see app/bots.py). Stored on the battle rather than as a fake
+    # BattleParticipant row so a bot can never appear in a query that counts
+    # players, and can never accidentally accrue league points or leaderboard
+    # position -- the honesty rules are enforced by the schema shape, not by
+    # remembering to filter.
+    bot_key: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
 class BattleParticipant(Base):

@@ -78,6 +78,11 @@ export interface ResultItem {
   is_correct: boolean;
   is_marked: boolean;
   explanation: string | null;
+  /** Null for an unanswered question — running out of time is not a mistake. */
+  label: AnswerLabel | null;
+  label_title: string | null;
+  label_message: string | null;
+  label_tone: 'success' | 'neutral' | 'warning' | 'danger' | null;
 }
 
 export interface PersonalBest {
@@ -96,6 +101,8 @@ export interface QuizResults {
   total: number;
   items: ResultItem[];
   personal_best: PersonalBest | null;
+  quality: AnswerQuality | null;
+  subject: string | null;
 }
 
 export interface TopicStat {
@@ -514,6 +521,9 @@ export interface Battle {
 }
 
 export interface BattleSide {
+  /** Always sent, never inferred from the name. */
+  is_bot?: boolean;
+  bot_blurb?: string | null;
   username: string;
   score: number;
   attempted: number;
@@ -538,6 +548,8 @@ export interface BattleResult {
   you: BattleSide;
   opponent: BattleSide | null;
   review: BattleReviewItem[];
+  /** A practice-bot result. Never counts toward leagues or leaderboards. */
+  vs_bot?: boolean;
 }
 
 export interface BattleLive {
@@ -593,4 +605,50 @@ export interface DailyQuestionResult {
   /** Null until enough students have answered for the comparison to mean anything. */
   faster_than_percent: number | null;
   streak: number;
+}
+
+/** Named mistake type for one answer. See backend/app/answer_labels.py. */
+export type AnswerLabel = 'sharp' | 'solid' | 'lucky' | 'slip' | 'gap' | 'blunder';
+
+export interface AnswerQuality {
+  /** Weighted, so a lucky guess does not read the same as a clean answer. */
+  accuracy: number | null;
+  counts: Partial<Record<AnswerLabel, number>>;
+  headline: string | null;
+  focus_topics: string[];
+}
+
+/**
+ * Predicted exam score for one subject.
+ *
+ * Note what is absent: the raw Glicko rating. It stays server-side on
+ * purpose — "I'm a 900 and my friend is a 1400" is the damage this framing
+ * exists to avoid.
+ */
+export interface SubjectRating {
+  subject: string;
+  predicted_score: number;
+  range_low: number;
+  range_high: number;
+  provisional: boolean;
+  answers_counted: number;
+  /** Only rendered when positive; a fall is never announced on its own. */
+  week_delta: number | null;
+}
+
+export interface RushState {
+  attempt_id: number;
+  score: number;
+  strikes: number;
+  strikes_allowed: number;
+  finished: boolean;
+  personal_best: number;
+}
+
+export interface PracticeBot {
+  key: string;
+  name: string;
+  rating: number;
+  blurb: string;
+  is_bot: true;
 }

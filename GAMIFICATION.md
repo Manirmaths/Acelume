@@ -1,7 +1,23 @@
 # Acelume — Gamification Roadmap
 
-Status: proposal. Written 2026-08-07.
-Companion document: `PRODUCT-ARCHITECTURE.md`.
+Status: partly BUILT as of 2026-08-07. Companion document: `PRODUCT-ARCHITECTURE.md`.
+
+| § | Feature | State |
+|---|---|---|
+| 1 | `answer_seconds` on `UserResponse` | **Built** |
+| 2 | Subject Rating (Glicko-2, shown as predicted score) | **Built** — `app/rating.py`, `app/rating_service.py` |
+| 3 | Bot opponents | **Built** — `app/bots.py` |
+| 4 | Answer-quality labels + accuracy | **Built** — `app/answer_labels.py` |
+| 5 | Daily Question | **Built** — `app/routers/daily_question.py` |
+| 6 | Rush mode | **Built** — `app/routers/rush.py` |
+| 7 | School clubs | Not started |
+| 8 | Arenas | Not started |
+| 9 | Insights as sentences | Not started |
+| 10 | Fair play | Not started — now needed, since ratings exist |
+
+The sections below are kept as written, because the reasoning is why each
+thing was built the way it was. Where the implementation departs from the
+proposal, the code comments say so.
 
 Chess.com is the right thing to learn from. It has kept tens of millions of people
 doing a hard, frequently humiliating cognitive task, daily, for years — which is

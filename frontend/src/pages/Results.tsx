@@ -10,6 +10,7 @@ import EmptyState from '../components/ui/EmptyState';
 import MathText from '../components/ui/MathText';
 import QuestionText from '../components/ui/QuestionText';
 import AskAcelume from '../components/AskAcelume';
+import AnswerReview, { AnswerLabelBadge } from '../components/AnswerReview';
 
 export default function Results() {
   const { attemptId = '' } = useParams();
@@ -137,6 +138,8 @@ export default function Results() {
         </Link>
       </div>
 
+      {data.quality && <AnswerReview quality={data.quality} subject={data.subject} />}
+
       <div className="space-y-3">
         {data.items.map((item, i) => (
           <Card key={item.question_id} padding="md">
@@ -149,6 +152,9 @@ export default function Results() {
             <div className="flex flex-wrap gap-2 mb-2">
               <Badge tone={item.is_correct ? 'success' : 'danger'}>Your answer: {item.selected_option}</Badge>
               {!item.is_correct && <Badge tone="success">Correct: {item.correct_option}</Badge>}
+              {item.label && (
+                <AnswerLabelBadge label={item.label} title={item.label_title} message={item.label_message} />
+              )}
             </div>
             {item.explanation && <p className="text-sm text-ink-500 mb-3 leading-relaxed"><MathText text={item.explanation} /></p>}
             <div className="flex items-center gap-4">

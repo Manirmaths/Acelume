@@ -11,6 +11,7 @@ import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import DailyMissions from '../components/DailyMissions';
 import DailyQuestionCard from '../components/DailyQuestionCard';
+import PredictedScores from '../components/PredictedScores';
 
 const GOAL_PRESETS = [
   { value: 20, label: 'Casual' },
@@ -163,6 +164,8 @@ export default function Dashboard() {
           removing the "what should I study today?" decision, which only works
           if they are the first thing a student sees. */}
       <DailyMissions />
+
+      <PredictedScores />
 
       {data.level && (
         <Card padding="md" className="mb-6">
