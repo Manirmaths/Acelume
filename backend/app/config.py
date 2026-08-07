@@ -23,6 +23,27 @@ class Settings:
     FREE_MOCK_EXAMS: int = int(os.environ.get("FREE_MOCK_EXAMS", "1"))
     IS_PRODUCTION: bool = os.environ.get("ENV", "development") == "production"
 
+    # Auth cookie SameSite policy. "lax" is correct and safe whenever the page
+    # and the API share a registrable domain -- acelume.ng -> api.acelume.ng
+    # is SAME-site, so Lax cookies are sent normally.
+    #
+    # It is NOT correct for a page served from a DIFFERENT registrable domain.
+    # naijaprep.com.ng -> api.acelume.ng is cross-site, so the browser refuses
+    # to STORE the Set-Cookie at all. That is the exact cause of the
+    # "Couldn't load your dashboard" report on 2026-08-07: the Android build
+    # in Play Store testing still points at naijaprep.com.ng, login returns
+    # 200 with a user body, the cookie is silently dropped, and every
+    # subsequent API call 401s. See MIGRATION-FOLLOWUPS.md.
+    #
+    # Setting this to "none" (which also forces Secure) makes the legacy
+    # domain work again without shipping a new APK. The tradeoff is a weaker
+    # CSRF posture: cookies would then ride along on cross-site requests.
+    # That is mitigated here -- every endpoint takes JSON, so every request is
+    # preflighted, and CORS allow_origins is an explicit allowlist with no
+    # wildcard -- but it is a real change and is left OFF by default so it is
+    # a deliberate decision rather than a silent one.
+    COOKIE_SAMESITE: str = os.environ.get("COOKIE_SAMESITE", "lax").lower()
+
     # Transactional email (password reset) via Resend's HTTP API. Left unset
     # in dev/until configured -- app/email.py falls back to logging the
     # reset link instead of failing, so forgot-password still works locally.

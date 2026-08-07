@@ -131,8 +131,58 @@ class SmartReviewStartIn(BaseModel):
 
 
 # ---------- Mock exam free navigation ----------
+# ---------- Daily Question ----------
+class DailyQuestionOut(BaseModel):
+    date: str
+    question_id: int
+    subject: Optional[str]
+    topic: str
+    question_text: str
+    image_url: Optional[str]
+    option_a: str
+    option_b: str
+    option_c: str
+    option_d: str
+
+    answered: bool
+    your_answer: Optional[str] = None
+    your_seconds: Optional[int] = None
+    is_correct: Optional[bool] = None
+    # Withheld until this student has answered -- see routers/daily_question.py.
+    correct_option: Optional[str] = None
+    explanation: Optional[str] = None
+
+    answered_count: int = 0
+    percent_correct: Optional[int] = None
+    average_seconds: Optional[int] = None
+    streak: int = 0
+
+
+class DailyQuestionAnswerIn(BaseModel):
+    selected_option: str
+    answer_seconds: Optional[int] = Field(default=None, ge=0, le=86400)
+
+
+class DailyQuestionResultOut(BaseModel):
+    is_correct: bool
+    correct_option: str
+    explanation: Optional[str]
+    your_seconds: Optional[int]
+    answered_count: int
+    percent_correct: Optional[int]
+    average_seconds: Optional[int]
+    # e.g. 88 -> "faster than 88% of students today". Null until enough people
+    # have answered for the comparison to mean anything.
+    faster_than_percent: Optional[int]
+    streak: int
+
+
 class MockAnswerIn(BaseModel):
     selected_option: Optional[str] = None  # None/empty = clear this answer
+    # Seconds spent on this question since it was last opened. Accumulated
+    # server-side across revisits (see routers/mock.py) because a mock exam
+    # allows free navigation. Optional for older clients.
+    answer_seconds: Optional[int] = Field(default=None, ge=0, le=86400)
 
 
 class MockNavItem(BaseModel):
@@ -172,6 +222,13 @@ class QuizAttemptOut(BaseModel):
 class AnswerIn(BaseModel):
     question_id: int
     selected_option: Optional[str] = None  # None/omitted = timeout / no answer
+    # Wall-clock seconds on this question, measured by the client. Optional so
+    # older app builds (which don't send it) keep working -- their answers are
+    # simply stored with no timing rather than rejected. Bounds here are a
+    # first line of defence only; see quiz.clamp_answer_seconds for the real
+    # clamp, which also handles nonsense the client may send in good faith
+    # (a backgrounded tab, a phone that slept mid-question).
+    answer_seconds: Optional[int] = Field(default=None, ge=0, le=86400)
 
 
 class AnswerOut(BaseModel):

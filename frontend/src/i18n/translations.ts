@@ -35,6 +35,14 @@ type Dict = Record<string, string>;
 
 export const translations: Record<Language, Dict> = {
   en: {
+    // Primary navigation: five destinations (see AppShell.tsx). The keys
+    // below them are still used by the Practice/Progress/Profile hub pages
+    // and by older links, so none of them are dead.
+    'nav.home': 'Home',
+    'nav.practice': 'Practice',
+    'nav.progress': 'Progress',
+    'nav.profile': 'Profile',
+
     'nav.dashboard': 'Dashboard',
     'nav.subjects': 'Subjects',
     'nav.learn': 'Learn',
@@ -72,6 +80,14 @@ export const translations: Record<Language, Dict> = {
     'auth.forgotPassword': 'Forgot password?',
   },
   ha: {
+    // Primary navigation. Following the review's conventions: impersonal
+    // where possible, and established loanwords kept where a translation
+    // would be less clear to a student than the English they already use.
+    'nav.home': 'Gida',
+    'nav.practice': 'Aiki',
+    'nav.progress': 'Ci gaba',
+    'nav.profile': 'Bayanan ku',
+
     'nav.dashboard': 'Dashboard',
     'nav.subjects': 'Darussa',
     'nav.learn': 'Koyo',

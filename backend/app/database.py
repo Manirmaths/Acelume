@@ -64,6 +64,12 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str]]] = {
         # leave without losing any learning feature.
         ("league_opted_out", "BOOLEAN NOT NULL DEFAULT FALSE"),
         ("league_tier", "VARCHAR(20) NOT NULL DEFAULT 'foundation'"),
+        # Daily Question streak -- a third, deliberately cheap streak. See the
+        # note on User.daily_question_streak for why it is separate from the
+        # Learning and Mastery streaks rather than folded into either.
+        ("daily_question_streak", "INTEGER NOT NULL DEFAULT 0"),
+        ("longest_daily_question_streak", "INTEGER NOT NULL DEFAULT 0"),
+        ("last_daily_question_date", "DATE"),
     ],
     # `battle` is new enough that most deployments will get these from
     # create_all(), but listing them is harmless there and essential on any
@@ -74,6 +80,13 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str]]] = {
     ],
     "battle_participant": [
         ("last_seen_at", "TIMESTAMP"),
+    ],
+    "user_response": [
+        # Per-question timing. Nullable with no default: rows written before
+        # this column existed genuinely have no timing, and a DEFAULT 0 would
+        # make every historical answer look instantaneous and corrupt any
+        # average built on the column.
+        ("answer_seconds", "INTEGER"),
     ],
     "quiz_attempt": [
         # Plain TEXT, not a native JSON/JSONB column type -- SQLAlchemy's

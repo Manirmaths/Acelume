@@ -554,3 +554,43 @@ export interface BattleLive {
   /** Presentational only — a dropped connection never forfeits a battle. */
   opponent_present: boolean;
 }
+
+/** One question a day, the same one for every student. */
+export interface DailyQuestion {
+  date: string;
+  question_id: number;
+  subject: string | null;
+  topic: string;
+  question_text: string;
+  image_url: string | null;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+
+  answered: boolean;
+  your_answer: string | null;
+  your_seconds: number | null;
+  is_correct: boolean | null;
+  /** Null until this student has answered — the API withholds it deliberately. */
+  correct_option: string | null;
+  explanation: string | null;
+
+  answered_count: number;
+  percent_correct: number | null;
+  average_seconds: number | null;
+  streak: number;
+}
+
+export interface DailyQuestionResult {
+  is_correct: boolean;
+  correct_option: string;
+  explanation: string | null;
+  your_seconds: number | null;
+  answered_count: number;
+  percent_correct: number | null;
+  average_seconds: number | null;
+  /** Null until enough students have answered for the comparison to mean anything. */
+  faster_than_percent: number | null;
+  streak: number;
+}

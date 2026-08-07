@@ -14,7 +14,7 @@ from app.schemas import (
     MockAnswerIn, MockNavItem, MockNavOut, MockQuestionOut, MockStartIn, QuizAttemptOut, ResultsOut,
 )
 from app.subjects import SUBJECTS
-from app.routers.quiz import _pick_pool, _attempt_out, _question_public, quiz_results
+from app.routers.quiz import _pick_pool, _attempt_out, _question_public, quiz_results, clamp_answer_seconds
 
 router = APIRouter(prefix="/api/mock", tags=["mock"])
 
@@ -165,13 +165,20 @@ def mock_save_answer(
         return
 
     is_correct = selected == question.correct_option
+    seconds = clamp_answer_seconds(payload.answer_seconds)
     if response:
         response.selected_option = selected
         response.is_correct = is_correct
+        # Accumulate rather than overwrite. Mock exams allow free navigation,
+        # so a student can return to a question several times; the honest
+        # total is all the time they spent on it, not just the final visit.
+        if seconds is not None:
+            response.answer_seconds = (response.answer_seconds or 0) + seconds
     else:
         db.add(UserResponse(
             user_id=user.id, question_id=qid, attempt_id=attempt_id,
             selected_option=selected, is_correct=is_correct,
+            answer_seconds=seconds,
         ))
     # No points/streak/mastery credit here -- deliberately deferred to
     # mock_submit() so re-answering the same question before submitting

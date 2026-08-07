@@ -9,6 +9,7 @@ import { DifficultyBadge } from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import MathText from '../components/ui/MathText';
+import AskAcelume from '../components/AskAcelume';
 import QuestionText from '../components/ui/QuestionText';
 
 const STREAK_MILESTONES = [3, 5, 10, 15, 20, 25];
@@ -106,6 +107,21 @@ export default function Quiz() {
     };
   }, []);
 
+  // When the currently-displayed question first appeared. Reset whenever the
+  // question changes, so the reported time covers only this question and not
+  // the time the student spent reading the explanation for the previous one.
+  //
+  // A ref rather than state: this must not trigger a re-render, and reading it
+  // inside submitAnswer must always see the latest value rather than one
+  // captured by a stale closure.
+  const questionShownAtRef = useRef<number>(Date.now());
+  useEffect(() => {
+    questionShownAtRef.current = Date.now();
+  }, [attempt?.current_question?.id]);
+
+  const secondsOnCurrentQuestion = () =>
+    Math.max(0, Math.round((Date.now() - questionShownAtRef.current) / 1000));
+
   const submitAnswer = async () => {
     // Guards against a double-tap/double-click firing two submissions before
     // the first response comes back (much more likely on a slow connection):
@@ -118,6 +134,7 @@ export default function Quiz() {
       const result = await api.post<AnswerResult>(`/api/quiz/${attempt.attempt_id}/answer`, {
         question_id: attempt.current_question.id,
         selected_option: selected,
+        answer_seconds: secondsOnCurrentQuestion(),
       });
       setFeedback(result);
 
@@ -280,6 +297,17 @@ export default function Quiz() {
               {feedback.is_correct ? 'Correct!' : `Not quite — correct answer is ${feedback.correct_option}.`}
             </p>
             {feedback.explanation && <p className="text-ink-600"><MathText text={feedback.explanation} /></p>}
+
+            {/* The moment of maximum value for the tutor: the student has just
+                been told they were wrong, the explanation is on screen, and
+                they either understood it or they did not. Waiting until the
+                results page means asking them to remember, ten questions
+                later, which one confused them. */}
+            <AskAcelume
+              questionId={q.id}
+              wasCorrect={feedback.is_correct}
+              className="text-ink-600"
+            />
           </div>
         )}
 

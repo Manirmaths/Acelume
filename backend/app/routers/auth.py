@@ -23,12 +23,15 @@ RESET_TOKEN_TTL_MINUTES = 30
 
 def _set_auth_cookie(response: Response, user_id: int) -> None:
     token = create_access_token(user_id)
+    samesite = settings.COOKIE_SAMESITE if settings.COOKIE_SAMESITE in ("lax", "strict", "none") else "lax"
+    # SameSite=None is meaningless (and rejected by browsers) without Secure.
+    secure = settings.IS_PRODUCTION or samesite == "none"
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
         httponly=True,
-        samesite="lax",
-        secure=settings.IS_PRODUCTION,
+        samesite=samesite,
+        secure=secure,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
     )

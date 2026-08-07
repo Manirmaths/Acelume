@@ -10,6 +10,7 @@ import ProgressBar from '../components/ui/ProgressBar';
 import Spinner from '../components/ui/Spinner';
 import EmptyState from '../components/ui/EmptyState';
 import DailyMissions from '../components/DailyMissions';
+import DailyQuestionCard from '../components/DailyQuestionCard';
 
 const GOAL_PRESETS = [
   { value: 20, label: 'Casual' },
@@ -75,7 +76,7 @@ export default function Dashboard() {
   const [savingGoal, setSavingGoal] = useState(false);
   const [startingReview, setStartingReview] = useState(false);
   const [startingDiagnostic, setStartingDiagnostic] = useState(false);
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api.get<DashboardData>('/api/dashboard'),
   });
@@ -117,9 +118,32 @@ export default function Dashboard() {
 
   if (isLoading) return <Spinner className="w-8 h-8 mt-16" />;
   if (error || !data) {
+    // A 401 here is not a loading failure, it is a dead session -- the student
+    // is looking at a signed-in shell with no valid cookie behind it. Saying
+    // "couldn't load" leaves them tapping refresh forever; say what actually
+    // happened and give them the one action that fixes it. See the note in
+    // context/AuthContext.tsx for how this state comes about.
+    const expired = error instanceof ApiError && error.status === 401;
     return (
       <div className="max-w-3xl mx-auto px-4 py-16">
-        <EmptyState icon="fa-solid fa-triangle-exclamation" title="Couldn't load your dashboard" />
+        <EmptyState
+          icon={expired ? 'fa-solid fa-arrow-right-to-bracket' : 'fa-solid fa-triangle-exclamation'}
+          title={expired ? 'Your session has ended' : "Couldn't load your dashboard"}
+          description={
+            expired
+              ? 'Please sign in again to pick up where you left off.'
+              : 'Check your connection and try again.'
+          }
+          action={
+            expired ? (
+              <Button onClick={() => navigate('/login')}>Sign in</Button>
+            ) : (
+              <Button variant="outline" onClick={() => refetch()}>
+                Try again
+              </Button>
+            )
+          }
+        />
       </div>
     );
   }
@@ -128,6 +152,12 @@ export default function Dashboard() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
       <h1 className="font-display font-extrabold text-2xl text-ink-900 mb-1">Welcome back, {user?.username}</h1>
       <p className="text-ink-500 mb-6">Here's how your practice is going.</p>
+
+      {/* Today's Question sits first: it is the single cheapest action on the
+          page -- one tap, no decision -- and the only one that is the same for
+          every student, so it is the one worth talking about. Missions follow,
+          since they still carry the "what should I study today?" decision. */}
+      <DailyQuestionCard />
 
       {/* Missions sit above everything else: the spec's purpose for them is
           removing the "what should I study today?" decision, which only works

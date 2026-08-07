@@ -21,6 +21,27 @@ router = APIRouter(prefix="/api/quiz", tags=["quiz"])
 
 RECENT_EXCLUDE_LIMIT = 50
 
+# Upper bound on a stored per-question time, in seconds.
+#
+# The client reports wall-clock time, which is honest right up until the phone
+# sleeps, the tab is backgrounded, or the student puts the app down and comes
+# back after dinner. Those produce real elapsed times of hours, and a single
+# one of them would wreck any mean built on this column. Ten minutes is well
+# past the slowest genuine attempt at a multiple-choice question and is the
+# point beyond which the number stops describing "how long this took to think
+# about".
+#
+# Clamped rather than discarded: that a question took a very long time is
+# itself signal, and dropping the row would lose the answer too.
+MAX_ANSWER_SECONDS = 600
+
+
+def clamp_answer_seconds(value: int | None) -> int | None:
+    """Bound client-reported timing. None in, None out -- never fabricate."""
+    if value is None:
+        return None
+    return max(0, min(int(value), MAX_ANSWER_SECONDS))
+
 # Modes whose results are allowed to advance topic mastery. A diagnostic
 # deliberately samples every subject shallowly, and "marked" replays questions
 # the student already flagged, so neither is evidence of understanding a topic.
@@ -280,6 +301,7 @@ def answer_quiz(attempt_id: int, payload: AnswerIn, db: Session = Depends(get_db
         attempt_id=attempt.id,
         selected_option=selected,
         is_correct=is_correct,
+        answer_seconds=clamp_answer_seconds(payload.answer_seconds),
     ))
     if is_correct:
         attempt.score += 1

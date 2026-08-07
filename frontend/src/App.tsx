@@ -39,6 +39,12 @@ const Achievements = lazy(() => import('./pages/Achievements'));
 const StudyPlanner = lazy(() => import('./pages/StudyPlanner'));
 const Flashcards = lazy(() => import('./pages/Flashcards'));
 const Review = lazy(() => import('./pages/Review'));
+// Hub pages backing the five-item primary navigation. Every route they link
+// to already existed and still works when opened directly -- these only add a
+// grouped entry point, they never became the only way in. See AppShell.tsx.
+const PracticeHub = lazy(() => import('./pages/PracticeHub'));
+const ProgressHub = lazy(() => import('./pages/ProgressHub'));
+const ProfileHub = lazy(() => import('./pages/ProfileHub'));
 const Admin = lazy(() => import('./pages/Admin'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -97,6 +103,9 @@ export default function App() {
           <Route path="/study-planner" element={<StudyPlanner />} />
           <Route path="/flashcards" element={<Flashcards />} />
           <Route path="/review" element={<Review />} />
+          <Route path="/practice" element={<PracticeHub />} />
+          <Route path="/progress" element={<ProgressHub />} />
+          <Route path="/profile" element={<ProfileHub />} />
           <Route
             path="/admin"
             element={

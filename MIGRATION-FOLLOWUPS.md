@@ -7,6 +7,62 @@ your closed-testing group. Task 1 is independent — do it whenever.
 
 ---
 
+## ⚠️ RESOLVED 2026-08-07 — "Couldn't load your dashboard" on the Android app
+
+**Symptom reported:** the app installed from Play Store testing showed
+*"Couldn't load your dashboard"*, and the launcher icon still read **Naija Prep**.
+
+**Both symptoms have the same cause: the phone is running the OLD build.**
+`strings.xml` already says `Acelume`, so a "Naija Prep" launcher label can only come from
+a build made before the rename. Capacitor writes `app_name` at `cap add` time and does
+**not** rewrite it on `cap sync`, so this is worth remembering: if the label is ever wrong
+in a *new* build, edit `android/app/src/main/res/values/strings.xml` directly.
+
+**Why the dashboard specifically failed — the part worth understanding:**
+
+1. The old build's `server.url` is `https://naijaprep.com.ng`.
+2. That domain serves the same static bundle as acelume.ng, and `VITE_API_URL` is baked in
+   at build time as `https://api.acelume.ng` (see `render.yaml`).
+3. `naijaprep.com.ng` → `api.acelume.ng` crosses **registrable domains**, so it is a
+   **cross-site** request — unlike `acelume.ng` → `api.acelume.ng`, which is same-site.
+4. The auth cookie was `SameSite=Lax`. On a cross-site response the browser **refuses to
+   store it at all**.
+5. `POST /api/auth/login` still returned **200 with a user body**. The frontend set that
+   user, `RequireAuth` let them through, and then every authenticated call 401'd.
+
+So the student saw a signed-in app with a dead session, and no way to recover — the
+worst possible failure shape, because nothing on screen suggested they were not logged in.
+
+**Fixes shipped:**
+
+- `frontend/src/context/AuthContext.tsx` — login and register now **verify the session**
+  with `GET /api/auth/me` before setting a user, and surface a real message if the cookie
+  did not persist. This is the durable fix: it also covers private browsing, blocked
+  third-party cookies and Safari ITP, none of which were handled before.
+- `frontend/src/pages/Dashboard.tsx` — a 401 now reads *"Your session has ended"* with a
+  Sign in button, instead of *"Couldn't load your dashboard"* with nothing to do.
+- `backend/app/config.py` — new `COOKIE_SAMESITE` env var, **default `lax`, unchanged**.
+
+**Decision left for you (deliberately not taken automatically):**
+
+Setting `COOKIE_SAMESITE=none` in the Render dashboard would un-break every existing
+tester **immediately, without shipping a new APK**, because it makes the cookie survive
+the cross-site request from naijaprep.com.ng.
+
+The cost is a weaker CSRF posture — cookies would ride along on cross-site requests. It is
+substantially mitigated here (every endpoint takes JSON, so every request is preflighted,
+and `allow_origins` is an explicit allowlist with no wildcard), but it is a real change to
+auth behaviour and was not worth making unilaterally.
+
+- **If testers are stuck on the old build for a while** → set `COOKIE_SAMESITE=none`.
+- **If the versionCode 6 build reaches them soon** → change nothing. That build points at
+  acelume.ng, which is same-site, and Lax works correctly.
+
+Either way, `SameSite=None` is only ever needed for the legacy domain. Once
+naijaprep.com.ng is retired, remove the env var.
+
+---
+
 ## 🚦 BLOCKING CONSTRAINT — read before touching naijaprep.com.ng
 
 **As of 2026-07-30, Play Console shows: _"12 testers have currently been opted in for 9 days

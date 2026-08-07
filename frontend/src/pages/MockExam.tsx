@@ -179,6 +179,18 @@ export default function MockExam() {
     return () => clearTimeout(t);
   }, [remaining, submitExam]);
 
+  // When the question currently on screen was opened. A mock exam allows free
+  // navigation, so this is reset on every jump; the backend ACCUMULATES the
+  // reported seconds across revisits rather than overwriting, which is the
+  // only way to get an honest total for a question a student came back to.
+  const questionOpenedAtRef = useRef<number>(Date.now());
+  useEffect(() => {
+    questionOpenedAtRef.current = Date.now();
+  }, [index]);
+
+  const secondsOnCurrentQuestion = () =>
+    Math.max(0, Math.round((Date.now() - questionOpenedAtRef.current) / 1000));
+
   const goTo = async (i: number) => {
     if (!nav || i < 0 || i >= nav.items.length) return;
     setIndex(i);
@@ -188,7 +200,13 @@ export default function MockExam() {
 
   const selectOption = async (letter: string) => {
     setSelected(letter);
-    await api.put(`/api/mock/${attemptId}/answer/${index}`, { selected_option: letter });
+    await api.put(`/api/mock/${attemptId}/answer/${index}`, {
+      selected_option: letter,
+      answer_seconds: secondsOnCurrentQuestion(),
+    });
+    // Changing the answer again on the same screen must not re-bill the same
+    // seconds, since the backend adds to the running total.
+    questionOpenedAtRef.current = Date.now();
     setNav((prev) => prev && {
       ...prev,
       items: prev.items.map((it) => (it.index === index ? { ...it, answered: true } : it)),

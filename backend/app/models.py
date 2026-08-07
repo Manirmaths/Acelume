@@ -57,6 +57,19 @@ class User(Base):
 
     has_taken_diagnostic: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Daily Question streak. A THIRD streak, deliberately -- the Learning
+    # streak needs a real practice session and the Mastery streak needs
+    # demonstrated accuracy, so both are things a student can be too tired or
+    # too busy to reach. This one costs a single tap.
+    #
+    # That is the entire point: the cheapest possible reason to open the app
+    # on a day the student was not going to study. A streak is at its
+    # strongest when the minimum qualifying action is nearly free, and neither
+    # existing streak is.
+    daily_question_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    longest_daily_question_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_daily_question_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
     # Dormant premium/subscription plumbing -- not enforced anywhere right now.
     premium_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
@@ -225,6 +238,21 @@ class UserResponse(Base):
     selected_option: Mapped[str] = mapped_column(String(1), nullable=False)
     is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Wall-clock seconds the student spent on this question, as reported by the
+    # client and clamped server-side (see routers/quiz.py::clamp_answer_seconds).
+    #
+    # Nullable on purpose: every row written before this column existed has no
+    # honest value, and inventing one would poison every average computed from
+    # it. Any analysis must therefore filter nulls rather than coalesce to 0.
+    #
+    # Deriving this from consecutive `timestamp` values is NOT an adequate
+    # substitute -- it breaks on pauses, backgrounded tabs, and the mock exam's
+    # free navigation, where a student can revisit a question much later.
+    #
+    # This is the input for: answer-quality labels (Lucky / Blunder), pacing
+    # insights, and the fair-play time floor. See GAMIFICATION.md.
+    answer_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="responses")
     question: Mapped["Question"] = relationship()
@@ -891,6 +919,56 @@ class MasteryPointLedger(Base):
     reason: Mapped[str] = mapped_column(String(80), nullable=False)
     ledger_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DailyQuestion(Base):
+    """
+    One question per calendar day, THE SAME for every student.
+
+    Deliberately distinct from DailyMission, which is personalised. That
+    personalisation is exactly what stops missions being social: no two
+    students have the same one, so there is nothing to compare, and nothing
+    to talk about. A shared question is a shared experience -- students
+    compare times and scores, which in this market means it travels through
+    WhatsApp study groups on its own.
+
+    The date is a plain calendar date in Africa/Lagos rather than per-student
+    local time. "Today's question" has to mean the same question to two
+    students messaging each other, and a timezone-relative version would give
+    a student who travelled a different question from their classmates.
+    """
+    __tablename__ = "daily_question"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    on_date: Mapped[date] = mapped_column(Date, nullable=False, unique=True, index=True)
+    question_id: Mapped[int] = mapped_column(ForeignKey("question.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    question: Mapped["Question"] = relationship()
+
+
+class DailyQuestionAttempt(Base):
+    """
+    One student's single attempt at a given day's question.
+
+    UNIQUE on (user_id, daily_question_id): one attempt each, enforced by the
+    database rather than an application check, so a double-tap or a replayed
+    request cannot produce a second, better score.
+    """
+    __tablename__ = "daily_question_attempt"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False, index=True)
+    daily_question_id: Mapped[int] = mapped_column(ForeignKey("daily_question.id"), nullable=False, index=True)
+
+    selected_option: Mapped[str] = mapped_column(String(1), nullable=False)
+    is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    answer_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "daily_question_id", name="uq_daily_attempt_user_question"),
+    )
 
 
 class Battle(Base):
