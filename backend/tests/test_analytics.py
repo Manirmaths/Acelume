@@ -348,3 +348,16 @@ def test_the_endpoint_returns_a_full_payload(admin_client, db_session):
 def test_the_endpoint_clamps_absurd_ranges(admin_client):
     assert admin_client.get("/api/admin/analytics?weeks=9999&days=9999").status_code == 200
     assert admin_client.get("/api/admin/analytics?weeks=0&days=0").status_code == 200
+
+
+def test_the_endpoint_rejects_a_logged_out_visitor(client):
+    """Retention data is business intelligence, not something to leak to anyone."""
+    assert client.get("/api/admin/analytics").status_code == 401
+
+
+def test_a_normal_student_cannot_reach_analytics_even_when_logged_in(client, register_user):
+    register_user()
+    res = client.get("/api/admin/analytics")
+    assert res.status_code == 403
+    # And nothing leaks in the error body.
+    assert "week_two_return_pct" not in res.text
