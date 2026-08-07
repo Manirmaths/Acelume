@@ -25,6 +25,28 @@ const API = '/api/exams/manage';
  * labels is how someone sets a sixty-minute exam to three minutes.
  */
 
+/**
+ * Say what actually went wrong.
+ *
+ * "Could not create the exam." on its own is useless precisely when it
+ * matters -- it cannot distinguish a backend that has not deployed yet from a
+ * server error from a validation problem, and each needs a different
+ * response. The server's own message is almost always the useful one, so it
+ * leads; the status code follows for the cases where it is not.
+ */
+function describe(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiError)) {
+    return `${fallback} The API could not be reached — it may still be starting up.`;
+  }
+  if (error.status === 404) {
+    return `${fallback} The API does not have this endpoint yet — the backend is probably still deploying.`;
+  }
+  if (error.status >= 500) {
+    return `${fallback} The server errored (${error.status}). Check the API logs. ${error.message}`;
+  }
+  return `${error.message} (HTTP ${error.status})`;
+}
+
 interface SubjectRow {
   subject: string;
   count: number;
@@ -85,7 +107,7 @@ export default function ExamBuilder({ onCreated }: { onCreated: () => void }) {
       setSession(created);
       setStep(3);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not create the exam.');
+      setError(describe(e, 'Could not create the exam.'));
     } finally {
       setBusy(false);
     }
@@ -131,7 +153,7 @@ export default function ExamBuilder({ onCreated }: { onCreated: () => void }) {
       setStep(4);
       await refreshReadiness();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not add candidates.');
+      setError(describe(e, 'Could not add candidates.'));
     } finally {
       setBusy(false);
     }
@@ -151,7 +173,7 @@ export default function ExamBuilder({ onCreated }: { onCreated: () => void }) {
       setStep(5);
       onCreated();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not publish.');
+      setError(describe(e, 'Could not publish.'));
     } finally {
       setBusy(false);
     }

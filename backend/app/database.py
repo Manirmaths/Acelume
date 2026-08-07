@@ -105,9 +105,62 @@ _PENDING_COLUMNS: dict[str, list[tuple[str, str]]] = {
 }
 
 
+def _autodetect_missing_columns(inspector, existing_tables: set[str]) -> list[tuple[str, str, str]]:
+    """
+    Find NULLABLE model columns that the live database does not have yet.
+
+    _PENDING_COLUMNS below is a hand-maintained list, and hand-maintained lists
+    get forgotten. That is not hypothetical: adding `school_reference` to
+    ExamCandidate without listing it here took the exam feature down in
+    production, because create_all() creates missing TABLES but never adds a
+    column to a table that already exists, and every SELECT against the model
+    then referenced a column the database did not have.
+
+    This closes the gap. Any nullable column present on a model but absent from
+    the table is added automatically, so forgetting the list can no longer
+    break a deploy.
+
+    Deliberately limited to NULLABLE columns with no server default. A NOT NULL
+    column needs a considered DEFAULT for the rows that already exist -- what
+    value is correct for historical data is a judgement, not something to
+    guess -- so those still belong in _PENDING_COLUMNS where the reasoning can
+    be written down.
+    """
+    from sqlalchemy import types as sqltypes
+
+    def ddl_for(column) -> str | None:
+        try:
+            return column.type.compile(dialect=engine.dialect)
+        except Exception:
+            # An exotic type we cannot render safely. Better to skip and let a
+            # human add it explicitly than to emit invalid DDL at startup.
+            return None
+
+    found: list[tuple[str, str, str]] = []
+    for table_name, table in Base.metadata.tables.items():
+        if table_name not in existing_tables:
+            continue  # create_all() will build it whole
+        present = {c["name"] for c in inspector.get_columns(table_name)}
+        listed = {name for name, _ in _PENDING_COLUMNS.get(table_name, [])}
+
+        for column in table.columns:
+            if column.name in present or column.name in listed:
+                continue
+            if not column.nullable or column.server_default is not None:
+                continue
+            ddl = ddl_for(column)
+            if ddl:
+                found.append((table_name, column.name, ddl))
+    return found
+
+
 def ensure_schema() -> None:
     inspector = inspect(engine)
     existing_tables = set(inspector.get_table_names())
+
+    for table, name, ddl in _autodetect_missing_columns(inspector, existing_tables):
+        with engine.begin() as conn:
+            conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {name} {ddl}'))
 
     for table, columns in _PENDING_COLUMNS.items():
         if table not in existing_tables:
