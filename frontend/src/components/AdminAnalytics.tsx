@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, ApiError } from '../api/client';
 import type { Analytics } from '../api/types';
 import Card from './ui/Card';
 import Spinner from './ui/Spinner';
@@ -35,14 +35,91 @@ function tone(value: number | null | undefined) {
   return 'text-ink-500';
 }
 
+/**
+ * Turn a failure into something the reader can act on.
+ *
+ * The first version of this screen said "Couldn't load analytics." and nothing
+ * else, which is the exact failure shape that made the dashboard bug so hard
+ * to pin down: it tells you something is wrong and gives you no way to find
+ * out what. A 404 and a 403 need completely different responses, and only the
+ * status code distinguishes them.
+ */
+function explain(error: unknown): { title: string; detail: string } {
+  const status = error instanceof ApiError ? error.status : null;
+
+  if (status === 404) {
+    return {
+      title: 'The API does not have this endpoint yet',
+      detail:
+        'The web app has deployed but the backend has not. Render builds them separately and ' +
+        'the Python service is slower. Check the acelume-api service in Render — once it finishes ' +
+        'deploying, reload this page.',
+    };
+  }
+  if (status === 401) {
+    return {
+      title: 'Your session has ended',
+      detail: 'Sign in again and come back to this tab.',
+    };
+  }
+  if (status === 403) {
+    return {
+      title: 'This account is not an admin',
+      detail: 'Retention data is admin-only. Promote the account from the Users tab.',
+    };
+  }
+  if (status && status >= 500) {
+    return {
+      title: `The server errored (${status})`,
+      detail:
+        'Check the acelume-api logs in Render for the traceback. This is a bug, not a ' +
+        'configuration problem.',
+    };
+  }
+  return {
+    title: "Couldn't reach the API",
+    detail:
+      'Usually a connection problem, or the backend is still cold-starting on the free plan ' +
+      '(that can take up to a minute). Try again in a moment.',
+  };
+}
+
 export default function AdminAnalytics() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-analytics'],
     queryFn: () => api.get<Analytics>('/api/admin/analytics'),
+    retry: false,
   });
 
   if (isLoading) return <Spinner className="w-8 h-8 mt-12" />;
-  if (!data) return <p className="text-sm text-ink-500">Couldn't load analytics.</p>;
+
+  if (error || !data) {
+    const { title, detail } = explain(error);
+    const status = error instanceof ApiError ? error.status : null;
+    return (
+      <Card padding="lg">
+        <div className="flex items-start gap-3">
+          <i className="fa-solid fa-triangle-exclamation text-warning-500 mt-0.5" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="font-display font-bold text-ink-900">
+              {title}
+              {status && <span className="font-normal text-ink-400 text-sm ml-2">HTTP {status}</span>}
+            </p>
+            <p className="text-sm text-ink-600 mt-1 leading-relaxed">{detail}</p>
+            {error instanceof ApiError && error.message && (
+              <p className="text-xs text-ink-400 mt-2 font-mono">{error.message}</p>
+            )}
+            <button
+              onClick={() => refetch()}
+              className="mt-3 text-xs font-semibold text-brand-600 hover:text-brand-700"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   const f = data.funnel;
   const peak = Math.max(1, ...data.daily.map((d) => d.signups));
