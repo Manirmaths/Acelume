@@ -14,14 +14,17 @@ git add -A
 git commit -m "add more seed_questions"
 git push origin main
 
+cd C:\dev\Acelume
+git push origin main
+
 cd "Downloads/Naija Prep"
 git push origin main
 
 Get-Process git -ErrorAction SilentlyContinue | Stop-Process -Force
 Remove-Item .git\index.lock -Force -ErrorAction SilentlyContinue
 git add -A
-git commit -m "Phase 1: rate limiting, security headers, tests, CI"
-git push
+git commit -m "Underline fix"
+git push origin main
 
 cd backend
 python -u sync_questions_db.py "sqlite:///./naijaprep.db"
@@ -45,3 +48,10 @@ python seed_syllabus.py "sqlite:///./naijaprep.db" --reset-order
 
 $env:OPENAI_API_KEY = 'sk-...'
 python tools/answer_keys.py --validate data/staging/ground_truth.csv --model gpt-4o
+
+
+Get-Process git -ErrorAction SilentlyContinue | Stop-Process -Force
+Remove-Item .git\index.lock -Force -ErrorAction SilentlyContinue
+git add -A
+git commit -m "More gamification and polishing 2"
+git push origin main

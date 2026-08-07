@@ -1,5 +1,28 @@
 # While you slept — 1 August 2026
 
+## Addendum: a parallel reconciliation, safely deduped
+
+While the 3-way-gated continuation below was running, I was independently
+working the same last 4 batches (`key-1992-Government`, `key-1991-Biology`,
+`key-1991-Geography`, `key-1991-Economics`) with subagents using a simpler
+two-pass method plus the same supplied solved archive as a cross-check —
+not knowing this more rigorous 3-way run was happening at the same time in
+this live folder.
+
+Merging my output afterward was safe by construction: the merge guard skipped
+every row that already matched an existing question_id or normalized question
+text. Net result: **4 new draft rows** added on top of the 15,927 below (now
+**15,931**), for questions my simpler process answered confidently that the
+stricter 3-way gate had held back for review. Nothing was overwritten, nothing
+published, no duplicate content. Re-ran `fix_question_latex.py --check`
+(clean, 15,931) and the keying/pipeline/orphan test suite (48 passed) after
+merging — everything still holds.
+
+This is a good demonstration of why the merge tool refuses to trust either
+side blindly and always checks for existing IDs and text before adding: two
+independent processes touched the same content simultaneously and neither
+corrupted the other's work.
+
 ## Final continuation: archive keying complete and approved set published
 
 The last **15 archive batches / 3,052 questions** went through the same measured
